@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+#
+# coolify-api — Operar una instancia de Coolify vía su API REST (v4).
+#
+# Convenciones del repo:
+#   - la ayuda y los errores de uso funcionan sin curl
+#   - --dry-run muestra la llamada exacta sin ejecutarla y NO requiere
+#     ni COOLIFY_URL ni token
+#   - datos por stdout; --json devuelve la respuesta de la API tal cual
+#   - exit: 0 ok · 1 error de API/conexión · 2 uso incorrecto ·
+#     127 falta curl/python3
+#
+# Apunta a la API v4 de Coolify. Las rutas concretas pueden variar entre
+# versiones; usa --dry-run para ver la llamada antes de lanzarla.
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+coolify-api — Operar Coolify vía su API REST (v4).
+
+Uso:
+  coolify-api apps                       Listar aplicaciones
+  coolify-api app UUID                   Detalle de una aplicación
+  coolify-api services                   Listar servicios
+  coolify-api databases                  Listar bases de datos
+  coolify-api deployments                Despliegues recientes/en curso
+  coolify-api deploy UUID [--force] [--tag T] [--dry-run]
+  coolify-api start|stop|restart UUID [--dry-run]
+
+Opciones:
+      --force       Forzar reconstrucción sin caché (deploy)
+      --tag T        Desplegar una etiqueta/imagen concreta (deploy)
+      --json         Salida JSON (respuesta de la API)
+      --dry-run      Mostrar la llamada sin ejecutarla
+  -h, --help         Esta ayuda
+
+Entorno:
+  COOLIFY_URL        URL base, p.ej. https://coolify.midominio.com
+                     (obligatoria salvo con --dry-run)
+  COOLIFY_TOKEN      API token (Bearer); obligatorio para llamadas reales
+
+Ejemplos:
+  coolify-api apps --json
+  coolify-api deploy 9b7c... --force
+  coolify-api restart 9b7c... --dry-run
+EOF
+}
+
+err() { echo "[coolify-api] $*" >&2; }
+
+for arg in "$@"; do case "$arg" in -h|--help) usage; exit 0 ;; esac; done
+
+[[ $# -lt 1 ]] && { usage >&2; exit 2; }
+SUB="$1"; shift
+[[ "$SUB" == "help" ]] && { usage; exit 0; }
+
+JSON=0
+DRY=0
+FORCE=0
+TAG=""
+declare -a POS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force)    FORCE=1; shift ;;
+    --tag)      TAG="$2"; shift 2 ;;
+    --json)     JSON=1; shift ;;
+    --dry-run)  DRY=1; shift ;;
+    -*)         err "opción desconocida: $1"; exit 2 ;;
+    *)          POS+=("$1"); shift ;;
+  esac
+done
+
+# 1) Validación de uso (exit 2) antes de exigir herramientas o entorno.
+UUID=""
+case "$SUB" in
+  apps|services|databases|deployments) ;;
+  app|deploy|start|stop|restart)
+    UUID="${POS[0]:-}"
+    [[ -z "$UUID" ]] && { err "'$SUB' requiere el UUID del recurso"; exit 2; } ;;
+  *)
+    err "subcomando desconocido: $SUB"
+    usage >&2
+    exit 2 ;;
+esac
+
+api_base()         { printf '%s/api/v1' "${COOLIFY_URL%/}"; }
+api_base_display() { local u="${COOLIFY_URL:-<COOLIFY_URL>}"; printf '%s/api/v1' "${u%/}"; }
+
+# Determinar método, ruta y si es operación de escritura (admite --dry-run).
+METHOD="GET"; PATH_Q=""; WRITE=0
+case "$SUB" in
+  apps)        PATH_Q="/applications" ;;
+  app)         PATH_Q="/applications/${UUID}" ;;
+  services)    PATH_Q="/services" ;;
+  databases)   PATH_Q="/databases" ;;
+  deployments) PATH_Q="/deployments" ;;
+  deploy)
+    WRITE=1
+    PATH_Q="/deploy?uuid=${UUID}&force=$([[ $FORCE -eq 1 ]] && echo true || echo false)"
+    [[ -n "$TAG" ]] && PATH_Q="${PATH_Q}&tag=${TAG}" ;;
+  start)       WRITE=1; PATH_Q="/applications/${UUID}/start" ;;
+  stop)        WRITE=1; PATH_Q="/applications/${UUID}/stop" ;;
+  restart)     WRITE=1; PATH_Q="/applications/${UUID}/restart" ;;
+esac
+
+# --dry-run: autosuficiente para operaciones de escritura.
+if [[ "$DRY" -eq 1 ]]; then
+  if [[ "$WRITE" -eq 1 ]]; then
+    err "[dry-run] ${METHOD} $(api_base_display)${PATH_Q}"
+    exit 0
+  fi
+  err "[dry-run] ${METHOD} $(api_base_display)${PATH_Q} (lectura)"
+  exit 0
+fi
+
+# 2) Herramientas (127) y entorno (2).
+command -v curl >/dev/null 2>&1 || { err "error: falta 'curl'"; exit 127; }
+command -v python3 >/dev/null 2>&1 || { err "error: falta 'python3'"; exit 127; }
+[[ -n "${COOLIFY_URL:-}" ]] || { err "error: define COOLIFY_URL (p.ej. https://coolify.midominio.com)"; exit 2; }
+
+declare -a AUTH=()
+[[ -n "${COOLIFY_TOKEN:-}" ]] && AUTH=(-H "Authorization: Bearer ${COOLIFY_TOKEN}")
+
+RESP_FILE="$(mktemp)"
+trap 'rm -f "$RESP_FILE"' EXIT
+STATUS=""
+
+if ! STATUS="$(curl -sS -o "$RESP_FILE" -w '%{http_code}' -X "$METHOD" \
+    -H "Accept: application/json" "${AUTH[@]}" "$(api_base)${PATH_Q}")"; then
+  err "error: no hay conexión con ${COOLIFY_URL}"
+  exit 1
+fi
+
+case "$STATUS" in
+  401|403) err "error: HTTP $STATUS (revisa COOLIFY_TOKEN y sus permisos)"; head -c 300 "$RESP_FILE" >&2; echo >&2; exit 1 ;;
+esac
+[[ "$STATUS" =~ ^2 ]] || { err "error: la API devolvió HTTP $STATUS"; head -c 400 "$RESP_FILE" >&2; echo >&2; exit 1; }
+
+# Salida.
+if [[ "$JSON" -eq 1 ]]; then
+  cat "$RESP_FILE"; echo
+  exit 0
+fi
+
+case "$SUB" in
+  apps|services|databases|deployments)
+    python3 - "$RESP_FILE" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+items = d.get("data") if isinstance(d, dict) and "data" in d else d
+if not isinstance(items, list):
+    items = [items]
+for it in items:
+    if not isinstance(it, dict):
+        print(it); continue
+    uuid = it.get("uuid") or it.get("id") or "?"
+    name = it.get("name") or it.get("fqdn") or it.get("description") or ""
+    status = it.get("status") or it.get("state") or ""
+    print(f"{uuid}\t{name}\t{status}".rstrip())
+PY
+    ;;
+  app)
+    python3 - "$RESP_FILE" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+if isinstance(d, dict) and "data" in d:
+    d = d["data"]
+print(f"uuid:   {d.get('uuid','?')}")
+print(f"nombre: {d.get('name','?')}")
+print(f"estado: {d.get('status', d.get('state','?'))}")
+if d.get("fqdn"):    print(f"fqdn:   {d['fqdn']}")
+if d.get("git_repository"): print(f"repo:   {d['git_repository']}")
+PY
+    ;;
+  deploy)
+    err "despliegue solicitado para ${UUID}"
+    python3 - "$RESP_FILE" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("(respuesta no JSON)"); sys.exit(0)
+if isinstance(d, dict):
+    print(d.get("message") or d.get("deployment_uuid") or json.dumps(d, ensure_ascii=False))
+else:
+    print(d)
+PY
+    ;;
+  start|stop|restart)
+    err "${SUB} solicitado para ${UUID}"
+    python3 - "$RESP_FILE" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1], encoding="utf-8"))
+    print(d.get("message", "ok") if isinstance(d, dict) else d)
+except Exception:
+    print("ok")
+PY
+    ;;
+esac

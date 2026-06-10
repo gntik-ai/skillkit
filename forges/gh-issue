@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+#
+# gh-issue — Gestionar issues de GitHub (list, view, create, comment, close, reopen).
+#
+# Patrón de referencia para la categoría forges/:
+#   - la ayuda y los errores de uso funcionan sin 'gh' instalado
+#   - --dry-run muestra el comando exacto sin ejecutarlo y NO requiere
+#     ni 'gh' ni token: sirve para previsualizar en cualquier entorno
+#   - credenciales desde entorno: GH_TOKEN / GITHUB_TOKEN (las lee 'gh')
+#   - datos por stdout; --json para salida estructurada (list/view)
+#   - exit: 0 ok · 1 no autenticado · 2 uso incorrecto · 127 falta 'gh'
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+gh-issue — Gestionar issues de GitHub.
+
+Uso:
+  gh-issue <subcomando> [opciones]
+
+Subcomandos:
+  list                      Listar issues
+  view    NUMERO            Ver un issue
+  create                    Crear un issue (requiere --title)
+  comment NUMERO            Comentar un issue (requiere --body)
+  close   NUMERO            Cerrar un issue
+  reopen  NUMERO            Reabrir un issue
+
+Opciones comunes:
+  -R, --repo OWNER/REPO     Repositorio (def. el del directorio actual)
+      --json                Salida JSON (list/view)
+      --dry-run             Mostrar el comando sin ejecutarlo (escritura)
+  -h, --help                Esta ayuda
+
+Opciones por subcomando:
+  list:    -s/--state open|closed|all   -L/--limit N   -l/--label NOMBRE
+  create:  -t/--title TXT (obligatorio)  -b/--body TXT  -l/--label NOMBRE
+  comment: -b/--body TXT (obligatorio)
+
+Entorno:
+  GH_TOKEN | GITHUB_TOKEN   Token de acceso (necesario para crear/modificar)
+
+Ejemplos:
+  gh-issue list -R my-org/falcone -s open -l tenant-isolation --json
+  gh-issue create -R my-org/falcone -t "Fuga entre tenants" -b "Detalle…" -l bug
+  gh-issue comment 42 -b "Reproducido en staging" --dry-run
+EOF
+}
+
+# La ayuda funciona aunque falte 'gh'.
+for arg in "$@"; do case "$arg" in -h|--help) usage; exit 0 ;; esac; done
+
+[[ $# -lt 1 ]] && { usage >&2; exit 2; }
+SUB="$1"; shift
+[[ "$SUB" == "help" ]] && { usage; exit 0; }
+
+JSON=0
+DRY=0
+STATE="open"
+LIMIT="30"
+TITLE=""
+BODY=""
+NUMBER=""
+declare -a REPO=()
+declare -a LABELS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -R|--repo)   REPO=(-R "$2"); shift 2 ;;
+    --json)      JSON=1; shift ;;
+    --dry-run)   DRY=1; shift ;;
+    -s|--state)  STATE="$2"; shift 2 ;;
+    -L|--limit)  LIMIT="$2"; shift 2 ;;
+    -l|--label)  LABELS+=(-l "$2"); shift 2 ;;
+    -t|--title)  TITLE="$2"; shift 2 ;;
+    -b|--body)   BODY="$2"; shift 2 ;;
+    -*)          echo "[gh-issue] opción desconocida: $1" >&2; exit 2 ;;
+    *)
+      [[ -n "$NUMBER" ]] && { echo "[gh-issue] argumento extra: $1" >&2; exit 2; }
+      NUMBER="$1"; shift ;;
+  esac
+done
+
+need_gh() {
+  command -v gh >/dev/null 2>&1 || {
+    echo "[gh-issue] error: 'gh' (GitHub CLI) no está instalado" >&2
+    exit 127
+  }
+}
+
+need_auth() {
+  gh auth status >/dev/null 2>&1 || {
+    echo "[gh-issue] error: no autenticado. Exporta GH_TOKEN o ejecuta 'gh auth login'." >&2
+    exit 1
+  }
+}
+
+# Ejecuta una acción de escritura. Con --dry-run imprime el comando exacto
+# por stderr y termina con 0: no requiere 'gh' ni credenciales.
+run_write() {
+  if [[ "$DRY" -eq 1 ]]; then
+    { printf '[dry-run] gh'; printf ' %q' "$@"; printf '\n'; } >&2
+    return 0
+  fi
+  need_gh
+  need_auth
+  gh "$@"
+}
+
+case "$SUB" in
+  list)
+    need_gh
+    declare -a CMD=(issue list -s "$STATE" -L "$LIMIT")
+    [[ ${#REPO[@]} -gt 0 ]]   && CMD+=("${REPO[@]}")
+    [[ ${#LABELS[@]} -gt 0 ]] && CMD+=("${LABELS[@]}")
+    [[ "$JSON" -eq 1 ]]       && CMD+=(--json "number,title,state,labels,createdAt,url")
+    gh "${CMD[@]}"
+    ;;
+  view)
+    [[ -z "$NUMBER" ]] && { echo "[gh-issue] 'view' requiere NUMERO" >&2; exit 2; }
+    need_gh
+    declare -a CMD=(issue view "$NUMBER")
+    [[ ${#REPO[@]} -gt 0 ]] && CMD+=("${REPO[@]}")
+    [[ "$JSON" -eq 1 ]]     && CMD+=(--json "number,title,state,body,labels,comments,url")
+    gh "${CMD[@]}"
+    ;;
+  create)
+    [[ -z "$TITLE" ]] && { echo "[gh-issue] 'create' requiere --title" >&2; exit 2; }
+    declare -a CMD=(issue create -t "$TITLE")
+    [[ ${#REPO[@]} -gt 0 ]]   && CMD+=("${REPO[@]}")
+    [[ -n "$BODY" ]]          && CMD+=(-b "$BODY")
+    [[ ${#LABELS[@]} -gt 0 ]] && CMD+=("${LABELS[@]}")
+    run_write "${CMD[@]}"
+    ;;
+  comment)
+    [[ -z "$NUMBER" ]] && { echo "[gh-issue] 'comment' requiere NUMERO" >&2; exit 2; }
+    [[ -z "$BODY" ]]   && { echo "[gh-issue] 'comment' requiere --body" >&2; exit 2; }
+    declare -a CMD=(issue comment "$NUMBER" -b "$BODY")
+    [[ ${#REPO[@]} -gt 0 ]] && CMD+=("${REPO[@]}")
+    run_write "${CMD[@]}"
+    ;;
+  close|reopen)
+    [[ -z "$NUMBER" ]] && { echo "[gh-issue] '$SUB' requiere NUMERO" >&2; exit 2; }
+    declare -a CMD=(issue "$SUB" "$NUMBER")
+    [[ ${#REPO[@]} -gt 0 ]] && CMD+=("${REPO[@]}")
+    run_write "${CMD[@]}"
+    ;;
+  *)
+    echo "[gh-issue] subcomando desconocido: $SUB" >&2
+    usage >&2
+    exit 2 ;;
+esac

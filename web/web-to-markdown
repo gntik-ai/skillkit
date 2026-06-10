@@ -1,0 +1,115 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["trafilatura>=1.12,<3"]
+# ///
+"""web-to-markdown — Descargar una página web y extraer su contenido principal como Markdown.
+
+Patrón de referencia para la categoría web/:
+  - dependencias declaradas en línea (PEP 723); se ejecuta con `uv run`
+  - el import de dependencias va DENTRO de main(): --help funciona sin instalarlas
+  - el Markdown va por stdout; con --json, un objeto con metadatos
+  - mensajes por stderr; exit: 0 ok · 1 fallo de descarga · 2 uso incorrecto
+    (argparse) · 3 sin contenido extraíble · 127 falta la dependencia
+
+Uso:
+  uv run web-to-markdown URL [--json] [--include-links] [--timeout S]
+
+Ejemplos:
+  uv run web-to-markdown https://example.com/post
+  uv run web-to-markdown https://example.com/post --json --include-links
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+
+
+def eprint(*args: object) -> None:
+    print(*args, file=sys.stderr)
+
+
+def _fetch_with_system_trust(url: str, timeout: int) -> str | None:
+    """Fallback de descarga con urllib.
+
+    Usa el almacén de certificados del sistema y los proxies de entorno, por lo
+    que funciona detrás de proxies corporativos con inspección TLS (Fortinet,
+    Zscaler…): el cliente interno de trafilatura valida contra el bundle de
+    certifi y falla en esos entornos aunque la red sí permita el acceso.
+    """
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "Mozilla/5.0 (skillkit/web-to-markdown)"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            charset = resp.headers.get_content_charset() or "utf-8"
+            return resp.read().decode(charset, errors="replace")
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return None
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog="web-to-markdown",
+        description="Extrae el contenido principal de una URL como Markdown.",
+    )
+    parser.add_argument("url", help="URL a descargar")
+    parser.add_argument("--json", action="store_true", help="Salida JSON con metadatos")
+    parser.add_argument("--include-links", action="store_true", help="Conservar enlaces en el Markdown")
+    parser.add_argument("--timeout", type=int, default=30, help="Timeout de descarga en segundos (def. 30)")
+    args = parser.parse_args()
+
+    # Import perezoso: --help y los errores de uso no requieren la dependencia.
+    try:
+        import trafilatura
+        from trafilatura.settings import use_config
+    except ImportError:
+        eprint("[web-to-markdown] error: falta 'trafilatura'. Ejecuta el script con `uv run`.")
+        return 127
+
+    # El timeout se aplica vía configuración de trafilatura (no hay kwarg directo).
+    config = use_config()
+    config.set("DEFAULT", "DOWNLOAD_TIMEOUT", str(args.timeout))
+
+    eprint(f"[web-to-markdown] descargando {args.url} (timeout {args.timeout}s)…")
+    downloaded = trafilatura.fetch_url(args.url, config=config)
+    if downloaded is None:
+        eprint("[web-to-markdown] descarga directa fallida; reintentando con la confianza TLS del sistema…")
+        downloaded = _fetch_with_system_trust(args.url, args.timeout)
+    if downloaded is None:
+        eprint(f"[web-to-markdown] error: no se pudo descargar {args.url}")
+        return 1
+
+    markdown = trafilatura.extract(
+        downloaded,
+        output_format="markdown",
+        include_links=args.include_links,
+        favor_precision=True,
+        config=config,
+    )
+    if not markdown:
+        eprint("[web-to-markdown] error: no se pudo extraer contenido legible")
+        return 3
+
+    if args.json:
+        meta = trafilatura.extract_metadata(downloaded)
+        out = {
+            "url": args.url,
+            "title": getattr(meta, "title", None) if meta else None,
+            "author": getattr(meta, "author", None) if meta else None,
+            "date": getattr(meta, "date", None) if meta else None,
+            "sitename": getattr(meta, "sitename", None) if meta else None,
+            "markdown": markdown,
+        }
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+    else:
+        print(markdown)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

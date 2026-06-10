@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+#
+# find-files — Buscar ficheros por nombre, tipo, extensión, fecha o tamaño.
+#
+# Patrón de referencia para scripts de la categoría fs/:
+#   - los datos van por stdout; los mensajes, por stderr
+#   - salida legible por defecto; array JSON con --json
+#   - códigos de salida significativos (0 ok, 1 ruta inválida, 2 uso incorrecto)
+#
+# Sustituible por `fd` (más rápido) sin cambiar la interfaz; aquí se usa `find`
+# por estar disponible en cualquier sistema.
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+find-files — Buscar ficheros por nombre, tipo, extensión, fecha o tamaño.
+
+Uso:
+  find-files [RUTA] [opciones]
+
+Opciones:
+  -n, --name GLOB       Patrón de nombre (p.ej. '*.py')
+  -e, --ext EXT         Extensión sin punto (p.ej. py); atajo de --name
+  -t, --type f|d        Solo ficheros (f) o directorios (d)
+  -d, --max-depth N     Profundidad máxima
+      --newer-than N    Modificados en los últimos N días
+      --larger-than S   Mayores que S (formato find: 10M, 500k, 2G…)
+      --json            Salida como array JSON
+  -h, --help            Esta ayuda
+
+Ejemplos:
+  find-files src --ext py --newer-than 7
+  find-files . --type d --name 'test*' --json
+EOF
+}
+
+ROOT="."
+JSON=0
+MAXDEPTH=""
+declare -a FIND_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--name)        FIND_ARGS+=(-name "$2"); shift 2 ;;
+    -e|--ext)         FIND_ARGS+=(-name "*.$2"); shift 2 ;;
+    -t|--type)
+      case "$2" in
+        f|d) FIND_ARGS+=(-type "$2") ;;
+        *)   echo "[find-files] --type debe ser 'f' (fichero) o 'd' (directorio)" >&2; exit 2 ;;
+      esac
+      shift 2 ;;
+    -d|--max-depth)   MAXDEPTH="$2"; shift 2 ;;
+    --newer-than)     FIND_ARGS+=(-mtime "-$2"); shift 2 ;;
+    --larger-than)    FIND_ARGS+=(-size "+$2"); shift 2 ;;
+    --json)           JSON=1; shift ;;
+    -h|--help)        usage; exit 0 ;;
+    -*)               echo "[find-files] opción desconocida: $1" >&2; exit 2 ;;
+    *)                ROOT="$1"; shift ;;
+  esac
+done
+
+if [[ ! -e "$ROOT" ]]; then
+  echo "[find-files] error: ruta no encontrada: $ROOT" >&2
+  exit 1
+fi
+
+# -maxdepth debe ir justo después de la ruta en find.
+declare -a CMD=(find "$ROOT")
+[[ -n "$MAXDEPTH" ]] && CMD+=(-maxdepth "$MAXDEPTH")
+[[ ${#FIND_ARGS[@]} -gt 0 ]] && CMD+=("${FIND_ARGS[@]}")
+
+if [[ "$JSON" -eq 1 ]]; then
+  "${CMD[@]}" -print0 | python3 -c '
+import sys, json
+data = sys.stdin.buffer.read().decode("utf-8", "replace")
+paths = [p for p in data.split("\0") if p]
+print(json.dumps(paths, ensure_ascii=False, indent=2))
+'
+else
+  "${CMD[@]}"
+fi

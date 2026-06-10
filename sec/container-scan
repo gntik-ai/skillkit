@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+#
+# container-scan — Escanear vulnerabilidades con trivy o grype.
+#
+# Auto-detecta la herramienta (trivy preferido) o se fuerza con --tool. Escanea
+# una imagen de contenedor por defecto, o un directorio con --fs.
+#
+# Convenciones del repo:
+#   - la ayuda y los errores de uso funcionan sin la herramienta
+#   - --dry-run muestra el comando exacto sin ejecutarlo (no requiere la herramienta)
+#   - el informe va por stdout; resumen y mensajes por stderr
+#   - exit: 0 sin vulnerabilidades al/por encima del umbral · 1 se encontraron ·
+#     2 uso incorrecto · 127 no hay herramienta de escaneo
+#
+# Flags concretos: trivy / grype.
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+container-scan — Escanear vulnerabilidades (trivy o grype).
+
+Uso:
+  container-scan IMAGEN [--severity LISTA] [--tool trivy|grype]
+                 [--ignore-unfixed] [--json] [--dry-run]
+  container-scan --fs RUTA [opciones]
+
+Opciones:
+      --fs RUTA          Escanear un directorio/proyecto en vez de una imagen
+      --severity LISTA   Umbral, p.ej. HIGH,CRITICAL (def. CRITICAL,HIGH)
+      --tool T           Forzar 'trivy' o 'grype' (def.: autodetección)
+      --ignore-unfixed   Ignorar vulnerabilidades sin parche disponible
+      --json             Salida JSON de la herramienta
+      --dry-run          Mostrar el comando sin ejecutarlo
+  -h, --help             Esta ayuda
+
+Salida: exit 1 si hay vulnerabilidades del nivel indicado (apto para CI).
+
+Ejemplos:
+  container-scan registry.local/falcone-api:latest --severity CRITICAL,HIGH
+  container-scan --fs . --ignore-unfixed --json
+  container-scan myimage:tag --tool grype --dry-run
+EOF
+}
+
+err() { echo "[container-scan] $*" >&2; }
+
+for arg in "$@"; do case "$arg" in -h|--help) usage; exit 0 ;; esac; done
+
+TOOL=""
+SEVERITY="CRITICAL,HIGH"
+FS_PATH=""
+IGNORE_UNFIXED=0
+JSON=0
+DRY=0
+declare -a POS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --fs)             FS_PATH="$2"; shift 2 ;;
+    --severity)       SEVERITY="$2"; shift 2 ;;
+    --tool)           TOOL="$2"; shift 2 ;;
+    --ignore-unfixed) IGNORE_UNFIXED=1; shift ;;
+    --json)           JSON=1; shift ;;
+    --dry-run)        DRY=1; shift ;;
+    -*)               err "opción desconocida: $1"; exit 2 ;;
+    *)                POS+=("$1"); shift ;;
+  esac
+done
+
+# 1) Validación de uso (exit 2).
+case "${TOOL:-auto}" in
+  auto|trivy|grype) ;;
+  *) err "--tool debe ser 'trivy' o 'grype'"; exit 2 ;;
+esac
+IMAGE="${POS[0]:-}"
+if [[ -z "$FS_PATH" && -z "$IMAGE" ]]; then
+  err "indica una IMAGEN o usa --fs RUTA"; usage >&2; exit 2
+fi
+if [[ -n "$FS_PATH" && -n "$IMAGE" ]]; then
+  err "usa una IMAGEN o --fs, no ambos"; exit 2
+fi
+if [[ -n "$FS_PATH" && "$DRY" -eq 0 && ! -e "$FS_PATH" ]]; then
+  err "error: la ruta no existe: $FS_PATH"; exit 2
+fi
+
+select_tool() {
+  if [[ -n "$TOOL" ]]; then echo "$TOOL"; return; fi
+  if command -v trivy >/dev/null 2>&1; then echo trivy; return; fi
+  if command -v grype >/dev/null 2>&1; then echo grype; return; fi
+  echo ""
+}
+CHOSEN="$(select_tool)"
+[[ -z "$CHOSEN" && "$DRY" -eq 1 ]] && CHOSEN="trivy"
+
+declare -a CMD=()
+build_cmd() {
+  if [[ "$CHOSEN" == "trivy" ]]; then
+    if [[ -n "$FS_PATH" ]]; then CMD=(trivy fs "$FS_PATH"); else CMD=(trivy image "$IMAGE"); fi
+    CMD+=(--severity "$SEVERITY" --exit-code 1)
+    [[ "$IGNORE_UNFIXED" -eq 1 ]] && CMD+=(--ignore-unfixed)
+    [[ "$JSON" -eq 1 ]] && CMD+=(--format json)
+  else  # grype
+    if [[ -n "$FS_PATH" ]]; then CMD=(grype "dir:${FS_PATH}"); else CMD=(grype "$IMAGE"); fi
+    # grype usa el nivel mínimo (en minúsculas); tomamos el menos severo de la lista.
+    local lowest; lowest="$(printf '%s' "$SEVERITY" | tr ',' '\n' | tr 'A-Z' 'a-z' | tail -1)"
+    CMD+=(--fail-on "${lowest:-high}")
+    [[ "$IGNORE_UNFIXED" -eq 1 ]] && CMD+=(--only-fixed)
+    [[ "$JSON" -eq 1 ]] && CMD+=(-o json)
+  fi
+  return 0
+}
+build_cmd
+
+if [[ "$DRY" -eq 1 ]]; then
+  err "[dry-run] ${CMD[*]}"
+  exit 0
+fi
+
+# 2) Herramienta disponible (exit 127).
+command -v "$CHOSEN" >/dev/null 2>&1 || {
+  err "error: '$CHOSEN' no está instalado (instala trivy o grype)"; exit 127; }
+
+RC=0
+"${CMD[@]}" || RC=$?
+if [[ "$RC" -eq 0 ]]; then
+  err "sin vulnerabilidades del nivel ${SEVERITY}"
+  exit 0
+fi
+err "se encontraron vulnerabilidades del nivel ${SEVERITY}"
+exit 1

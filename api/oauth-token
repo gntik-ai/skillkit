@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+#
+# oauth-token — Obtener un token de acceso OAuth2 e imprimirlo por stdout.
+#
+# Pensado para automatizaciones contra APIs protegidas (AWS Cognito, Keycloak,
+# Auth0, etc.). Por defecto imprime solo el access_token, de modo que compone:
+#     TOKEN="$(oauth-token client_credentials --scope api/read)"
+#     curl -H "Authorization: Bearer $TOKEN" https://api...
+#
+# Convenciones del repo:
+#   - la ayuda y los errores de uso funcionan sin curl
+#   - --dry-run muestra la petición (con el secreto enmascarado) sin enviarla
+#     y NO requiere credenciales ni endpoint reales
+#   - el access_token va por stdout; mensajes por stderr; --json = respuesta completa
+#   - exit: 0 ok · 1 error HTTP/conexión · 2 uso incorrecto ·
+#     3 respuesta sin access_token · 127 falta curl/python3
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+oauth-token — Obtener un token de acceso OAuth2.
+
+Uso:
+  oauth-token client_credentials [--scope S] [--auth-basic] [opciones]
+  oauth-token password --username U --password P [--scope S] [opciones]
+  oauth-token refresh_token --refresh-token RT [opciones]
+  oauth-token device [--scope S] [--interval S] [--device-timeout S] [opciones]
+
+Opciones comunes:
+      --token-url URL     Endpoint de token (o env OAUTH_TOKEN_URL)
+      --client-id ID      (o env OAUTH_CLIENT_ID)
+      --client-secret S   (o env OAUTH_CLIENT_SECRET)
+      --scope S           Scopes separados por espacio
+      --audience A        Parámetro 'audience' (Auth0)
+      --auth-basic        Enviar client_id:secret como cabecera Basic
+                          (Cognito lo requiere para clientes confidenciales)
+      --device-url URL    Endpoint de device authorization (solo 'device';
+                          o env OAUTH_DEVICE_URL)
+      --interval S        Segundos entre sondeos del device flow (def. 5)
+      --device-timeout S  Máximo de espera del device flow (def. 300)
+      --timeout S         Timeout por petición HTTP (def. 30)
+      --json              Imprimir la respuesta completa del servidor
+  -h, --help              Esta ayuda
+
+Entorno:
+  OAUTH_TOKEN_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_DEVICE_URL
+
+Ejemplos:
+  oauth-token client_credentials --scope "api/read" --auth-basic
+  oauth-token password --username svc --password "$PW" --json
+  oauth-token device --scope "openid profile"
+EOF
+}
+
+err() { echo "[oauth-token] $*" >&2; }
+
+for arg in "$@"; do case "$arg" in -h|--help) usage; exit 0 ;; esac; done
+
+[[ $# -lt 1 ]] && { usage >&2; exit 2; }
+GRANT="$1"; shift
+[[ "$GRANT" == "help" ]] && { usage; exit 0; }
+
+TOKEN_URL="${OAUTH_TOKEN_URL:-}"
+CLIENT_ID="${OAUTH_CLIENT_ID:-}"
+CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-}"
+DEVICE_URL="${OAUTH_DEVICE_URL:-}"
+SCOPE=""
+AUDIENCE=""
+USERNAME=""
+PASSWORD=""
+REFRESH=""
+AUTH_BASIC=0
+INTERVAL=5
+DEVICE_TIMEOUT=300
+TIMEOUT=30
+JSON=0
+DRY=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --token-url)      TOKEN_URL="$2"; shift 2 ;;
+    --client-id)      CLIENT_ID="$2"; shift 2 ;;
+    --client-secret)  CLIENT_SECRET="$2"; shift 2 ;;
+    --scope)          SCOPE="$2"; shift 2 ;;
+    --audience)       AUDIENCE="$2"; shift 2 ;;
+    --username)       USERNAME="$2"; shift 2 ;;
+    --password)       PASSWORD="$2"; shift 2 ;;
+    --refresh-token)  REFRESH="$2"; shift 2 ;;
+    --device-url)     DEVICE_URL="$2"; shift 2 ;;
+    --auth-basic)     AUTH_BASIC=1; shift ;;
+    --interval)       INTERVAL="$2"; shift 2 ;;
+    --device-timeout) DEVICE_TIMEOUT="$2"; shift 2 ;;
+    --timeout)        TIMEOUT="$2"; shift 2 ;;
+    --json)           JSON=1; shift ;;
+    --dry-run)        DRY=1; shift ;;
+    -*)               err "opción desconocida: $1"; exit 2 ;;
+    *)                err "argumento inesperado: $1"; exit 2 ;;
+  esac
+done
+
+# 1) Validación de uso (exit 2) según el grant.
+case "$GRANT" in
+  client_credentials) ;;
+  password)
+    [[ -z "$USERNAME" || -z "$PASSWORD" ]] && { err "'password' requiere --username y --password"; exit 2; } ;;
+  refresh_token)
+    [[ -z "$REFRESH" ]] && { err "'refresh_token' requiere --refresh-token"; exit 2; } ;;
+  device) ;;
+  *)
+    err "grant desconocido: $GRANT"
+    usage >&2
+    exit 2 ;;
+esac
+
+# Construir el cuerpo x-www-form-urlencoded (campos -d de curl).
+declare -a FORM=()
+add_form() { if [[ -n "$2" ]]; then FORM+=(--data-urlencode "$1=$2"); fi; }
+
+case "$GRANT" in
+  client_credentials)
+    FORM+=(--data-urlencode "grant_type=client_credentials") ;;
+  password)
+    FORM+=(--data-urlencode "grant_type=password")
+    add_form username "$USERNAME"; add_form password "$PASSWORD" ;;
+  refresh_token)
+    FORM+=(--data-urlencode "grant_type=refresh_token")
+    add_form refresh_token "$REFRESH" ;;
+esac
+add_form scope "$SCOPE"
+add_form audience "$AUDIENCE"
+
+# Autenticación del cliente: Basic header o credenciales en el cuerpo.
+declare -a AUTH=()
+if [[ "$AUTH_BASIC" -eq 1 ]]; then
+  [[ -n "$CLIENT_ID" ]] && AUTH=(-u "${CLIENT_ID}:${CLIENT_SECRET}")
+else
+  add_form client_id "$CLIENT_ID"
+  add_form client_secret "$CLIENT_SECRET"
+fi
+
+# Representación enmascarada para --dry-run y logs.
+masked_form() {
+  local out=""
+  local i=0
+  while [[ $i -lt ${#FORM[@]} ]]; do
+    if [[ "${FORM[$i]}" == "--data-urlencode" ]]; then
+      local kv="${FORM[$((i+1))]}"
+      case "$kv" in
+        client_secret=*|password=*|refresh_token=*) out+="${kv%%=*}=*** " ;;
+        *) out+="$kv " ;;
+      esac
+      i=$((i+2))
+    else
+      i=$((i+1))
+    fi
+  done
+  printf '%s' "${out% }"
+}
+
+# --dry-run: autosuficiente, sin exigir endpoint ni curl (cubre todos los grants).
+if [[ "$DRY" -eq 1 ]]; then
+  if [[ "$GRANT" == "device" ]]; then
+    err "[dry-run] POST ${DEVICE_URL:-<OAUTH_DEVICE_URL>} (device_authorization)"
+    err "[dry-run] → polling POST ${TOKEN_URL:-<OAUTH_TOKEN_URL>} (grant device_code)"
+  else
+    local_url="${TOKEN_URL:-<OAUTH_TOKEN_URL>}"
+    basic_note=""
+    [[ "$AUTH_BASIC" -eq 1 ]] && basic_note=" (Authorization: Basic ${CLIENT_ID:-<client_id>}:***)"
+    err "[dry-run] POST ${local_url}${basic_note}"
+    err "[dry-run] body: $(masked_form)"
+  fi
+  exit 0
+fi
+
+# 2) Herramientas (exit 127) y endpoint (exit 2).
+command -v curl >/dev/null 2>&1 || { err "error: falta 'curl'"; exit 127; }
+command -v python3 >/dev/null 2>&1 || { err "error: falta 'python3'"; exit 127; }
+
+RESP_FILE="$(mktemp)"
+trap 'rm -f "$RESP_FILE"' EXIT
+STATUS=""
+
+post_form() {  # post_form URL [campos de formulario...]
+  local url="$1"; shift
+  if ! STATUS="$(curl -sS --max-time "$TIMEOUT" -o "$RESP_FILE" -w '%{http_code}' \
+      -H "Accept: application/json" "${AUTH[@]}" "$@" "$url")"; then
+    err "error: no hay conexión con ${url} (o se superó el timeout de ${TIMEOUT}s)"
+    exit 1
+  fi
+}
+
+field() {  # field CLAVE  (lee RESP_FILE; vacío si no está)
+  python3 - "$RESP_FILE" "$1" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+v = d.get(sys.argv[2], "") if isinstance(d, dict) else ""
+print(v if isinstance(v, (str, int)) else "")
+PY
+}
+
+emit_token() {
+  if [[ "$JSON" -eq 1 ]]; then
+    cat "$RESP_FILE"; echo
+    return 0
+  fi
+  local tok; tok="$(field access_token)"
+  if [[ -z "$tok" ]]; then
+    err "error: la respuesta no contiene access_token"
+    head -c 300 "$RESP_FILE" >&2; echo >&2
+    return 3
+  fi
+  printf '%s\n' "$tok"
+}
+
+# --- Device authorization grant (dos fases con sondeo) -------------------
+if [[ "$GRANT" == "device" ]]; then
+  [[ -z "$DEVICE_URL" ]] && { err "'device' requiere --device-url (o OAUTH_DEVICE_URL)"; exit 2; }
+  [[ -z "$TOKEN_URL" ]]  && { err "'device' requiere --token-url (o OAUTH_TOKEN_URL)"; exit 2; }
+  declare -a DFORM=(--data-urlencode "client_id=${CLIENT_ID}")
+  [[ -n "$SCOPE" ]] && DFORM+=(--data-urlencode "scope=${SCOPE}")
+  post_form "$DEVICE_URL" "${DFORM[@]}"
+  [[ "$STATUS" =~ ^2 ]] || { err "error: device authorization devolvió HTTP $STATUS"; head -c 300 "$RESP_FILE" >&2; echo >&2; exit 1; }
+  DEVICE_CODE="$(field device_code)"
+  USER_CODE="$(field user_code)"
+  VERIFY_URI="$(field verification_uri)"
+  VERIFY_FULL="$(field verification_uri_complete)"
+  SRV_INTERVAL="$(field interval)"; [[ -n "$SRV_INTERVAL" ]] && INTERVAL="$SRV_INTERVAL"
+  [[ -z "$DEVICE_CODE" ]] && { err "error: el servidor no devolvió device_code"; exit 1; }
+  err "Abre ${VERIFY_FULL:-$VERIFY_URI} e introduce el código: ${USER_CODE}"
+
+  DEADLINE=$(( SECONDS + DEVICE_TIMEOUT ))
+  while :; do
+    sleep "$INTERVAL"
+    post_form "$TOKEN_URL" \
+      --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:device_code" \
+      --data-urlencode "device_code=${DEVICE_CODE}" \
+      --data-urlencode "client_id=${CLIENT_ID}"
+    if [[ "$STATUS" =~ ^2 ]]; then
+      emit_token; exit $?
+    fi
+    ERRC="$(field error)"
+    case "$ERRC" in
+      authorization_pending) : ;;
+      slow_down)             INTERVAL=$(( INTERVAL + 5 )) ;;
+      ""|*)
+        err "error: device flow falló (HTTP $STATUS${ERRC:+, $ERRC})"
+        exit 1 ;;
+    esac
+    if (( SECONDS >= DEADLINE )); then err "error: timeout del device flow (${DEVICE_TIMEOUT}s)"; exit 1; fi
+  done
+fi
+
+# --- Grants de una sola petición ----------------------------------------
+[[ -z "$TOKEN_URL" ]] && { err "error: define --token-url (o OAUTH_TOKEN_URL)"; exit 2; }
+post_form "$TOKEN_URL" "${FORM[@]}"
+if [[ ! "$STATUS" =~ ^2 ]]; then
+  err "error: el endpoint de token devolvió HTTP $STATUS"
+  head -c 400 "$RESP_FILE" >&2; echo >&2
+  exit 1
+fi
+emit_token
+exit $?

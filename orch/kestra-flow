@@ -1,0 +1,279 @@
+#!/usr/bin/env bash
+#
+# kestra-flow — Validar, desplegar y ejecutar flujos de Kestra vía API REST.
+#
+# Convenciones del repo:
+#   - la ayuda y los errores de uso funcionan sin curl ni servidor
+#   - --dry-run muestra la llamada exacta sin ejecutarla y NO requiere
+#     ni KESTRA_URL ni credenciales
+#   - datos por stdout; --json devuelve las respuestas de la API tal cual
+#   - exit: 0 ok · 1 error de API, validación fallida o ejecución FAILED ·
+#     2 uso incorrecto · 127 faltan curl/python3
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+kestra-flow — Validar, desplegar y ejecutar flujos de Kestra.
+
+Uso:
+  kestra-flow validate FICHERO.yaml [--json]
+  kestra-flow deploy   FICHERO.yaml [--json] [--dry-run]
+  kestra-flow execute  NAMESPACE FLOW_ID [--input k=v ...] [--wait]
+                       [--wait-timeout S] [--json] [--dry-run]
+  kestra-flow status   EXECUTION_ID [--json]
+  kestra-flow logs     EXECUTION_ID
+  kestra-flow list     [NAMESPACE] [--json]
+
+Opciones:
+      --input k=v        Input del flujo (repetible; solo execute)
+      --wait             Esperar al estado terminal de la ejecución
+      --wait-timeout S   Máximo de espera (def. 600)
+      --json             Salida JSON (respuesta de la API)
+      --dry-run          Mostrar la llamada sin ejecutarla
+  -h, --help             Esta ayuda
+
+Entorno:
+  KESTRA_URL             URL base, p.ej. http://localhost:8080 (obligatoria
+                         salvo con --dry-run)
+  KESTRA_TENANT          Tenant en la ruta de la API (las instalaciones
+                         recientes suelen requerir 'main'; vacío en OSS antiguas)
+  KESTRA_API_TOKEN       Token Bearer (EE/Cloud), o bien:
+  KESTRA_USER / KESTRA_PASSWORD   Basic auth (OSS)
+
+Ejemplos:
+  kestra-flow validate flows/etl.yaml
+  kestra-flow deploy flows/etl.yaml --dry-run
+  kestra-flow execute prod etl-diario --input fecha=2026-06-10 --wait
+EOF
+}
+
+err() { echo "[kestra-flow] $*" >&2; }
+
+# La ayuda funciona siempre.
+for arg in "$@"; do case "$arg" in -h|--help) usage; exit 0 ;; esac; done
+
+[[ $# -lt 1 ]] && { usage >&2; exit 2; }
+SUB="$1"; shift
+[[ "$SUB" == "help" ]] && { usage; exit 0; }
+
+JSON=0
+DRY=0
+WAIT=0
+WAIT_TIMEOUT=600
+declare -a INPUTS=()
+declare -a POS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --input)        INPUTS+=(-F "$2"); shift 2 ;;
+    --wait)         WAIT=1; shift ;;
+    --wait-timeout) WAIT_TIMEOUT="$2"; shift 2 ;;
+    --json)         JSON=1; shift ;;
+    --dry-run)      DRY=1; shift ;;
+    -*)             err "opción desconocida: $1"; exit 2 ;;
+    *)              POS+=("$1"); shift ;;
+  esac
+done
+
+# 1) Validación de uso (exit 2) antes de exigir herramientas o entorno.
+case "$SUB" in
+  validate|deploy)
+    FILE="${POS[0]:-}"
+    [[ -z "$FILE" ]] && { err "'$SUB' requiere un fichero de flujo"; exit 2; }
+    ;;
+  execute)
+    NS="${POS[0]:-}"; FLOW="${POS[1]:-}"
+    [[ -z "$NS" || -z "$FLOW" ]] && { err "'execute' requiere NAMESPACE y FLOW_ID"; exit 2; }
+    ;;
+  status|logs)
+    EXEC_ID="${POS[0]:-}"
+    [[ -z "$EXEC_ID" ]] && { err "'$SUB' requiere EXECUTION_ID"; exit 2; }
+    ;;
+  list)
+    NS="${POS[0]:-}"
+    ;;
+  *)
+    err "subcomando desconocido: $SUB"
+    usage >&2
+    exit 2 ;;
+esac
+
+# 2) Herramientas y entorno (--dry-run es autosuficiente y se salta esto).
+need_tools() {
+  command -v curl >/dev/null 2>&1 || { err "error: falta 'curl'"; exit 127; }
+  command -v python3 >/dev/null 2>&1 || { err "error: falta 'python3'"; exit 127; }
+}
+need_url() {
+  [[ -n "${KESTRA_URL:-}" ]] || { err "error: define KESTRA_URL (p.ej. http://localhost:8080)"; exit 2; }
+}
+
+api_base() { printf '%s/api/v1%s' "${KESTRA_URL%/}" "${KESTRA_TENANT:+/${KESTRA_TENANT}}"; }
+api_base_display() {
+  local url="${KESTRA_URL:-<KESTRA_URL>}"
+  printf '%s/api/v1%s' "${url%/}" "${KESTRA_TENANT:+/${KESTRA_TENANT}}"
+}
+
+declare -a AUTH=()
+build_auth() {
+  if [[ -n "${KESTRA_API_TOKEN:-}" ]]; then
+    AUTH=(-H "Authorization: Bearer ${KESTRA_API_TOKEN}")
+  elif [[ -n "${KESTRA_USER:-}" ]]; then
+    AUTH=(-u "${KESTRA_USER}:${KESTRA_PASSWORD:-}")
+  fi
+}
+
+# Las respuestas se guardan en RESP_FILE; los parsers Python leen el fichero
+# por ruta, evitando problemas de quoting con cuerpos arbitrarios.
+RESP_FILE="$(mktemp)"
+trap 'rm -f "$RESP_FILE"' EXIT
+STATUS=""
+
+# call MÉTODO URL [args extra de curl...]
+call() {
+  local method="$1" url="$2"; shift 2
+  if ! STATUS="$(curl -sS -o "$RESP_FILE" -w '%{http_code}' -X "$method" "${AUTH[@]}" "$@" "$url")"; then
+    err "error: no hay conexión con ${url}"
+    exit 1
+  fi
+}
+
+fail_api() {
+  err "error: la API devolvió HTTP $STATUS"
+  head -c 400 "$RESP_FILE" >&2; echo >&2
+  exit 1
+}
+
+flow_field() { awk -v key="$1" '$0 ~ "^"key":" {sub("^"key":[[:space:]]*",""); gsub(/"/,""); print; exit}' "$2"; }
+
+json_field() {  # json_field CLAVE_PUNTEADA  (lee RESP_FILE)
+  python3 - "$RESP_FILE" "$1" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+for k in sys.argv[2].split("."):
+    d = d.get(k, {}) if isinstance(d, dict) else {}
+print(d if isinstance(d, str) else "")
+PY
+}
+
+case "$SUB" in
+  validate)
+    [[ -f "$FILE" ]] || { err "error: no existe $FILE"; exit 1; }
+    need_tools; need_url; build_auth
+    call POST "$(api_base)/flows/validate" -H "Content-Type: application/x-yaml" --data-binary @"$FILE"
+    [[ "$STATUS" =~ ^2 ]] || fail_api
+    PARSE_RC=0
+    python3 - "$RESP_FILE" "$JSON" <<'PY' || PARSE_RC=$?
+import json, sys
+raw = open(sys.argv[1], encoding="utf-8").read()
+data = json.loads(raw)
+items = data if isinstance(data, list) else [data]
+bad = [a for a in items if a.get("constraints")]
+if sys.argv[2] == "1":
+    print(raw)
+else:
+    for a in items:
+        flow = a.get("flow") or "?"
+        if a.get("constraints"):
+            print(f"FAIL {flow}: {a['constraints']}")
+        else:
+            print(f"OK   {flow}")
+sys.exit(1 if bad else 0)
+PY
+    exit "$PARSE_RC"
+    ;;
+  deploy)
+    [[ -f "$FILE" ]] || { err "error: no existe $FILE"; exit 1; }
+    NS="$(flow_field namespace "$FILE")"
+    ID="$(flow_field id "$FILE")"
+    [[ -z "$NS" || -z "$ID" ]] && { err "error: el flujo debe declarar 'id' y 'namespace' en el nivel superior"; exit 2; }
+    if [[ "$DRY" -eq 1 ]]; then
+      err "[dry-run] PUT $(api_base_display)/flows/${NS}/${ID} --data-binary @${FILE} (upsert; POST /flows si no existe)"
+      exit 0
+    fi
+    need_tools; need_url; build_auth
+    call PUT "$(api_base)/flows/${NS}/${ID}" -H "Content-Type: application/x-yaml" --data-binary @"$FILE"
+    ACTION="actualizado"
+    if [[ "$STATUS" == "404" ]]; then
+      call POST "$(api_base)/flows" -H "Content-Type: application/x-yaml" --data-binary @"$FILE"
+      ACTION="creado"
+    fi
+    [[ "$STATUS" =~ ^2 ]] || fail_api
+    if [[ "$JSON" -eq 1 ]]; then cat "$RESP_FILE"; echo; else echo "${NS}.${ID} ${ACTION}"; fi
+    ;;
+  execute)
+    if [[ "$DRY" -eq 1 ]]; then
+      err "[dry-run] POST $(api_base_display)/executions/${NS}/${FLOW}${INPUTS[*]:+ ${INPUTS[*]}}"
+      exit 0
+    fi
+    need_tools; need_url; build_auth
+    if [[ ${#INPUTS[@]} -gt 0 ]]; then
+      call POST "$(api_base)/executions/${NS}/${FLOW}" "${INPUTS[@]}"
+    else
+      call POST "$(api_base)/executions/${NS}/${FLOW}"
+    fi
+    [[ "$STATUS" =~ ^2 ]] || fail_api
+    EXEC_ID="$(json_field id)"
+    [[ -z "$EXEC_ID" ]] && { err "error: la API no devolvió id de ejecución"; head -c 300 "$RESP_FILE" >&2; echo >&2; exit 1; }
+    err "ejecución lanzada: $EXEC_ID"
+    if [[ "$WAIT" -eq 0 ]]; then
+      if [[ "$JSON" -eq 1 ]]; then cat "$RESP_FILE"; echo; else echo "$EXEC_ID"; fi
+      exit 0
+    fi
+    DEADLINE=$(( SECONDS + WAIT_TIMEOUT ))
+    LAST=""
+    while :; do
+      call GET "$(api_base)/executions/${EXEC_ID}"
+      [[ "$STATUS" =~ ^2 ]] || fail_api
+      STATE="$(json_field state.current)"
+      [[ "$STATE" != "$LAST" ]] && { err "estado: ${STATE:-?}"; LAST="$STATE"; }
+      case "$STATE" in
+        SUCCESS|WARNING|FAILED|KILLED|CANCELLED) break ;;
+      esac
+      if (( SECONDS >= DEADLINE )); then
+        err "error: timeout esperando la ejecución (${WAIT_TIMEOUT}s)"
+        exit 1
+      fi
+      sleep 3
+    done
+    if [[ "$JSON" -eq 1 ]]; then cat "$RESP_FILE"; echo; else echo "$STATE"; fi
+    case "$STATE" in SUCCESS|WARNING) exit 0 ;; *) exit 1 ;; esac
+    ;;
+  status)
+    need_tools; need_url; build_auth
+    call GET "$(api_base)/executions/${EXEC_ID}"
+    [[ "$STATUS" =~ ^2 ]] || fail_api
+    if [[ "$JSON" -eq 1 ]]; then cat "$RESP_FILE"; echo; else
+      python3 - "$RESP_FILE" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+state = (d.get("state") or {}).get("current", "?")
+print(f"{d.get('namespace','?')}.{d.get('flowId','?')} → {state}")
+PY
+    fi
+    ;;
+  logs)
+    need_tools; need_url; build_auth
+    call GET "$(api_base)/logs/${EXEC_ID}/download"
+    [[ "$STATUS" =~ ^2 ]] || fail_api
+    cat "$RESP_FILE"; echo
+    ;;
+  list)
+    need_tools; need_url; build_auth
+    if [[ -n "${NS:-}" ]]; then
+      call GET "$(api_base)/flows/${NS}"
+    else
+      call GET "$(api_base)/flows/search?size=100"
+    fi
+    [[ "$STATUS" =~ ^2 ]] || fail_api
+    if [[ "$JSON" -eq 1 ]]; then cat "$RESP_FILE"; echo; else
+      python3 - "$RESP_FILE" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+flows = d.get("results") if isinstance(d, dict) else d
+for f in flows or []:
+    print(f"{f.get('namespace','?')}.{f.get('id','?')}")
+PY
+    fi
+    ;;
+esac

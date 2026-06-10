@@ -1,0 +1,3879 @@
+{
+  "version": "0.2.0",
+  "conventions": {
+    "output": "datos por stdout, mensajes por stderr",
+    "json": "flag --json para salida estructurada",
+    "help": "--help funciona siempre, aunque falte la herramienta base",
+    "order": "validar argumentos (exit 2) antes de comprobar dependencias (exit 127)",
+    "python_deps": "dependencias en línea (PEP 723), ejecutar con `uv run`; import dentro de main()",
+    "destructive": "flag --dry-run en operaciones que escriben/borran; no requiere credenciales",
+    "exit_codes": "0 ok · 1 ejecución · 2 uso incorrecto · 127 falta la herramienta",
+    "secrets": "credenciales desde variables de entorno, nunca hardcodeadas"
+  },
+  "categories": [
+    {
+      "id": "fs",
+      "name": "Sistema de ficheros y búsqueda",
+      "dir": "fs/"
+    },
+    {
+      "id": "text",
+      "name": "Texto y datos estructurados",
+      "dir": "text/"
+    },
+    {
+      "id": "docs",
+      "name": "Conversión de documentos y medios",
+      "dir": "docs/"
+    },
+    {
+      "id": "containers",
+      "name": "Contenedores y orquestación",
+      "dir": "containers/"
+    },
+    {
+      "id": "web",
+      "name": "Descarga y scraping web",
+      "dir": "web/"
+    },
+    {
+      "id": "net",
+      "name": "Red y diagnóstico",
+      "dir": "net/"
+    },
+    {
+      "id": "vcs",
+      "name": "Control de versiones",
+      "dir": "vcs/"
+    },
+    {
+      "id": "forges",
+      "name": "Plataformas de repositorios",
+      "dir": "forges/"
+    },
+    {
+      "id": "pkg",
+      "name": "Paquetes y dependencias",
+      "dir": "pkg/"
+    },
+    {
+      "id": "data",
+      "name": "Bases de datos y datos",
+      "dir": "data/"
+    },
+    {
+      "id": "crypto",
+      "name": "Codificación, criptografía y secretos",
+      "dir": "crypto/"
+    },
+    {
+      "id": "proc",
+      "name": "Sistema, procesos y orquestación local",
+      "dir": "proc/"
+    },
+    {
+      "id": "quality",
+      "name": "Pruebas, linting y calidad",
+      "dir": "quality/"
+    },
+    {
+      "id": "api",
+      "name": "Cliente HTTP / API genérico",
+      "dir": "api/"
+    },
+    {
+      "id": "cloud",
+      "name": "Nubes e infraestructura",
+      "dir": "cloud/"
+    },
+    {
+      "id": "ai",
+      "name": "IA y LLMs",
+      "dir": "ai/"
+    },
+    {
+      "id": "obs",
+      "name": "Observabilidad",
+      "dir": "obs/"
+    },
+    {
+      "id": "msg",
+      "name": "Mensajería y notificaciones",
+      "dir": "msg/"
+    },
+    {
+      "id": "store",
+      "name": "Almacenamiento de objetos y backups",
+      "dir": "store/"
+    },
+    {
+      "id": "orch",
+      "name": "Orquestadores de workflows",
+      "dir": "orch/"
+    },
+    {
+      "id": "validate",
+      "name": "Esquemas y políticas",
+      "dir": "validate/"
+    },
+    {
+      "id": "sec",
+      "name": "Seguridad y cadena de suministro",
+      "dir": "sec/"
+    },
+    {
+      "id": "bench",
+      "name": "Rendimiento",
+      "dir": "bench/"
+    }
+  ],
+  "scripts": [
+    {
+      "id": "find-files",
+      "category": "fs",
+      "path": "fs/find-files",
+      "base": [
+        "fd",
+        "find"
+      ],
+      "description": "Buscar ficheros por nombre, tipo, extensión, fecha o tamaño",
+      "status": "implemented",
+      "lang": "bash",
+      "flags": [
+        "--name",
+        "--ext",
+        "--type",
+        "--max-depth",
+        "--newer-than",
+        "--larger-than",
+        "--json"
+      ],
+      "usage": "find-files src --ext py --newer-than 7 --json"
+    },
+    {
+      "id": "search-content",
+      "category": "fs",
+      "path": "fs/search-content",
+      "base": [
+        "ripgrep",
+        "grep"
+      ],
+      "description": "Buscar texto o regex en un árbol de ficheros",
+      "status": "planned"
+    },
+    {
+      "id": "safe-delete",
+      "category": "fs",
+      "path": "fs/safe-delete",
+      "base": [
+        "trash-cli"
+      ],
+      "description": "Borrar a la papelera en vez de rm -rf (reversible)",
+      "status": "planned"
+    },
+    {
+      "id": "bulk-rename",
+      "category": "fs",
+      "path": "fs/bulk-rename",
+      "base": [
+        "rename",
+        "mmv"
+      ],
+      "description": "Renombrar en lote por patrón o regex",
+      "status": "planned"
+    },
+    {
+      "id": "tree-view",
+      "category": "fs",
+      "path": "fs/tree-view",
+      "base": [
+        "eza",
+        "tree"
+      ],
+      "description": "Listar el árbol de directorios filtrando ruido",
+      "status": "planned"
+    },
+    {
+      "id": "file-type",
+      "category": "fs",
+      "path": "fs/file-type",
+      "base": [
+        "file"
+      ],
+      "description": "Detectar el tipo/MIME real de un fichero",
+      "status": "planned"
+    },
+    {
+      "id": "dedupe-files",
+      "category": "fs",
+      "path": "fs/dedupe-files",
+      "base": [
+        "fdupes",
+        "jdupes"
+      ],
+      "description": "Encontrar o eliminar duplicados por hash",
+      "status": "planned"
+    },
+    {
+      "id": "disk-usage",
+      "category": "fs",
+      "path": "fs/disk-usage",
+      "base": [
+        "dust",
+        "du"
+      ],
+      "description": "Uso de disco por carpeta, ordenado",
+      "status": "planned"
+    },
+    {
+      "id": "archive",
+      "category": "fs",
+      "path": "fs/archive",
+      "base": [
+        "tar",
+        "unzip",
+        "7z"
+      ],
+      "description": "Comprimir/descomprimir detectando el formato",
+      "status": "planned"
+    },
+    {
+      "id": "sync-dir",
+      "category": "fs",
+      "path": "fs/sync-dir",
+      "base": [
+        "rsync"
+      ],
+      "description": "Copiar/sincronizar incremental con filtros",
+      "status": "planned"
+    },
+    {
+      "id": "watch-files",
+      "category": "fs",
+      "path": "fs/watch-files",
+      "base": [
+        "watchexec",
+        "entr"
+      ],
+      "description": "Ejecutar un comando al cambiar ficheros",
+      "status": "planned"
+    },
+    {
+      "id": "chmod-tree",
+      "category": "fs",
+      "path": "fs/chmod-tree",
+      "base": [
+        "chmod",
+        "chown"
+      ],
+      "description": "Fijar permisos/propietario recursivos seguros",
+      "status": "planned"
+    },
+    {
+      "id": "json-query",
+      "category": "text",
+      "path": "text/json-query",
+      "base": [
+        "jq"
+      ],
+      "description": "Consultar/transformar JSON",
+      "status": "planned"
+    },
+    {
+      "id": "yaml-query",
+      "category": "text",
+      "path": "text/yaml-query",
+      "base": [
+        "yq"
+      ],
+      "description": "Leer/editar YAML",
+      "status": "planned"
+    },
+    {
+      "id": "xml-query",
+      "category": "text",
+      "path": "text/xml-query",
+      "base": [
+        "xmlstarlet",
+        "xmllint"
+      ],
+      "description": "Consultar/validar XML",
+      "status": "planned"
+    },
+    {
+      "id": "csv-tool",
+      "category": "text",
+      "path": "text/csv-tool",
+      "base": [
+        "csvkit",
+        "miller"
+      ],
+      "description": "Filtrar/unir/convertir/estadísticas de CSV",
+      "status": "planned"
+    },
+    {
+      "id": "toml-tool",
+      "category": "text",
+      "path": "text/toml-tool",
+      "base": [
+        "tomlq",
+        "dasel"
+      ],
+      "description": "Leer/editar TOML",
+      "status": "planned"
+    },
+    {
+      "id": "multi-query",
+      "category": "text",
+      "path": "text/multi-query",
+      "base": [
+        "dasel"
+      ],
+      "description": "Consultar JSON/YAML/TOML/XML con una sola sintaxis",
+      "status": "planned"
+    },
+    {
+      "id": "text-extract",
+      "category": "text",
+      "path": "text/text-extract",
+      "base": [
+        "grep",
+        "sed",
+        "awk"
+      ],
+      "description": "Extraer por regex o por campos",
+      "status": "planned"
+    },
+    {
+      "id": "diff-text",
+      "category": "text",
+      "path": "text/diff-text",
+      "base": [
+        "delta",
+        "diff",
+        "patch"
+      ],
+      "description": "Diff legible y aplicación de parches",
+      "status": "planned"
+    },
+    {
+      "id": "dedupe-lines",
+      "category": "text",
+      "path": "text/dedupe-lines",
+      "base": [
+        "sort",
+        "uniq"
+      ],
+      "description": "Ordenar/uniq/contar líneas",
+      "status": "planned"
+    },
+    {
+      "id": "encoding-convert",
+      "category": "text",
+      "path": "text/encoding-convert",
+      "base": [
+        "iconv"
+      ],
+      "description": "Convertir codificación/charset",
+      "status": "planned"
+    },
+    {
+      "id": "template-render",
+      "category": "text",
+      "path": "text/template-render",
+      "base": [
+        "envsubst",
+        "jinja2-cli"
+      ],
+      "description": "Rellenar plantillas con variables",
+      "status": "planned"
+    },
+    {
+      "id": "doc-convert",
+      "category": "docs",
+      "path": "docs/doc-convert",
+      "base": [
+        "pandoc"
+      ],
+      "description": "Convertir entre md/html/docx/pdf/rst",
+      "status": "planned"
+    },
+    {
+      "id": "office-convert",
+      "category": "docs",
+      "path": "docs/office-convert",
+      "base": [
+        "libreoffice"
+      ],
+      "description": "Conversión office headless (docx→pdf, xlsx→csv…)",
+      "status": "planned"
+    },
+    {
+      "id": "pdf-text",
+      "category": "docs",
+      "path": "docs/pdf-text",
+      "base": [
+        "pdftotext",
+        "pdfplumber"
+      ],
+      "description": "Extraer texto/tablas de un PDF",
+      "status": "planned"
+    },
+    {
+      "id": "pdf-ops",
+      "category": "docs",
+      "path": "docs/pdf-ops",
+      "base": [
+        "qpdf",
+        "pdftk"
+      ],
+      "description": "Unir/dividir/rotar/recortar PDF",
+      "status": "planned"
+    },
+    {
+      "id": "pdf-ocr",
+      "category": "docs",
+      "path": "docs/pdf-ocr",
+      "base": [
+        "ocrmypdf",
+        "tesseract"
+      ],
+      "description": "OCR sobre PDF o imagen escaneada",
+      "status": "planned"
+    },
+    {
+      "id": "img-convert",
+      "category": "docs",
+      "path": "docs/img-convert",
+      "base": [
+        "imagemagick",
+        "cwebp"
+      ],
+      "description": "Convertir/redimensionar/optimizar imágenes",
+      "status": "planned"
+    },
+    {
+      "id": "media-transcode",
+      "category": "docs",
+      "path": "docs/media-transcode",
+      "base": [
+        "ffmpeg"
+      ],
+      "description": "Convertir/recortar audio y vídeo",
+      "status": "planned"
+    },
+    {
+      "id": "exif-tool",
+      "category": "docs",
+      "path": "docs/exif-tool",
+      "base": [
+        "exiftool"
+      ],
+      "description": "Leer o limpiar metadatos de ficheros",
+      "status": "planned"
+    },
+    {
+      "id": "docker-build",
+      "category": "containers",
+      "path": "containers/docker-build",
+      "base": [
+        "docker"
+      ],
+      "description": "Construir imagen con cache y tags",
+      "status": "planned"
+    },
+    {
+      "id": "docker-run",
+      "category": "containers",
+      "path": "containers/docker-run",
+      "base": [
+        "docker"
+      ],
+      "description": "Ejecutar contenedor efímero con limpieza",
+      "status": "planned"
+    },
+    {
+      "id": "docker-logs",
+      "category": "containers",
+      "path": "containers/docker-logs",
+      "base": [
+        "docker"
+      ],
+      "description": "Seguir logs / exec / inspect",
+      "status": "planned"
+    },
+    {
+      "id": "docker-prune",
+      "category": "containers",
+      "path": "containers/docker-prune",
+      "base": [
+        "docker"
+      ],
+      "description": "Limpiar imágenes/volúmenes/redes huérfanas",
+      "status": "planned"
+    },
+    {
+      "id": "compose-up",
+      "category": "containers",
+      "path": "containers/compose-up",
+      "base": [
+        "docker compose"
+      ],
+      "description": "Levantar/parar/logs de un stack",
+      "status": "planned"
+    },
+    {
+      "id": "podman-run",
+      "category": "containers",
+      "path": "containers/podman-run",
+      "base": [
+        "podman"
+      ],
+      "description": "Equivalente rootless a docker",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-get",
+      "category": "containers",
+      "path": "containers/k8s-get",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Listar o describir recursos de Kubernetes/OpenShift",
+      "status": "implemented",
+      "lang": "bash",
+      "flags": [
+        "--namespace",
+        "--all-namespaces",
+        "--selector",
+        "--describe",
+        "--wide",
+        "--json"
+      ],
+      "env": [
+        "KUBECTL"
+      ],
+      "notes": "Compatible con OpenShift usando KUBECTL=oc; sonda de conectividad vía /version (apta para RBAC restringido)",
+      "usage": "KUBECTL=oc k8s-get pods -n NS -l app=api --json"
+    },
+    {
+      "id": "k8s-logs",
+      "category": "containers",
+      "path": "containers/k8s-logs",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Logs / exec / port-forward de pods",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-apply",
+      "category": "containers",
+      "path": "containers/k8s-apply",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Aplicar y hacer diff de manifiestos",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-rollout",
+      "category": "containers",
+      "path": "containers/k8s-rollout",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Desplegar y vigilar rollout/status",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-context",
+      "category": "containers",
+      "path": "containers/k8s-context",
+      "base": [
+        "kubectx",
+        "kubens"
+      ],
+      "description": "Cambiar contexto/namespace de forma segura",
+      "status": "planned"
+    },
+    {
+      "id": "helm-deploy",
+      "category": "containers",
+      "path": "containers/helm-deploy",
+      "base": [
+        "helm"
+      ],
+      "description": "Instalar/actualizar/plantilla de charts",
+      "status": "planned"
+    },
+    {
+      "id": "kustomize-build",
+      "category": "containers",
+      "path": "containers/kustomize-build",
+      "base": [
+        "kustomize"
+      ],
+      "description": "Renderizar overlays",
+      "status": "planned"
+    },
+    {
+      "id": "oc-tool",
+      "category": "containers",
+      "path": "containers/oc-tool",
+      "base": [
+        "oc"
+      ],
+      "description": "Operaciones OpenShift (proyectos, rutas, builds)",
+      "status": "planned"
+    },
+    {
+      "id": "local-cluster",
+      "category": "containers",
+      "path": "containers/local-cluster",
+      "base": [
+        "kind",
+        "minikube"
+      ],
+      "description": "Crear un clúster local efímero para pruebas",
+      "status": "planned"
+    },
+    {
+      "id": "fetch-url",
+      "category": "web",
+      "path": "web/fetch-url",
+      "base": [
+        "curl",
+        "wget"
+      ],
+      "description": "Descargar con reintentos/resume/headers",
+      "status": "planned"
+    },
+    {
+      "id": "http-request",
+      "category": "web",
+      "path": "web/http-request",
+      "base": [
+        "httpie",
+        "curl"
+      ],
+      "description": "Cliente REST legible (GET/POST/JSON)",
+      "status": "planned"
+    },
+    {
+      "id": "web-to-markdown",
+      "category": "web",
+      "path": "web/web-to-markdown",
+      "base": [
+        "trafilatura"
+      ],
+      "description": "Extraer el contenido principal de una URL como Markdown",
+      "status": "implemented",
+      "lang": "python",
+      "runner": "uv run",
+      "deps": [
+        "trafilatura>=1.12,<3"
+      ],
+      "flags": [
+        "--json",
+        "--include-links",
+        "--timeout"
+      ],
+      "usage": "uv run web/web-to-markdown <URL> --json",
+      "notes": "Fallback de descarga con la confianza TLS del sistema: funciona tras proxies corporativos con inspección TLS"
+    },
+    {
+      "id": "html-parse",
+      "category": "web",
+      "path": "web/html-parse",
+      "base": [
+        "pup",
+        "beautifulsoup4"
+      ],
+      "description": "Extraer nodos por selector CSS",
+      "status": "planned"
+    },
+    {
+      "id": "render-page",
+      "category": "web",
+      "path": "web/render-page",
+      "base": [
+        "playwright",
+        "puppeteer"
+      ],
+      "description": "Renderizar páginas con JS y extraer el DOM",
+      "status": "planned"
+    },
+    {
+      "id": "screenshot-page",
+      "category": "web",
+      "path": "web/screenshot-page",
+      "base": [
+        "playwright"
+      ],
+      "description": "Captura de pantalla de una URL",
+      "status": "planned"
+    },
+    {
+      "id": "crawl-site",
+      "category": "web",
+      "path": "web/crawl-site",
+      "base": [
+        "wget",
+        "scrapy"
+      ],
+      "description": "Recorrer sitemap/enlaces con límite de profundidad",
+      "status": "planned"
+    },
+    {
+      "id": "download-batch",
+      "category": "web",
+      "path": "web/download-batch",
+      "base": [
+        "aria2c",
+        "curl"
+      ],
+      "description": "Descargar una lista de URLs en paralelo",
+      "status": "planned"
+    },
+    {
+      "id": "dns-lookup",
+      "category": "net",
+      "path": "net/dns-lookup",
+      "base": [
+        "dig",
+        "host"
+      ],
+      "description": "Resolver A/AAAA/MX/TXT/CNAME",
+      "status": "planned"
+    },
+    {
+      "id": "ping-host",
+      "category": "net",
+      "path": "net/ping-host",
+      "base": [
+        "ping",
+        "fping"
+      ],
+      "description": "Comprobar alcanzabilidad y latencia",
+      "status": "planned"
+    },
+    {
+      "id": "trace-route",
+      "category": "net",
+      "path": "net/trace-route",
+      "base": [
+        "mtr",
+        "traceroute"
+      ],
+      "description": "Trazar la ruta de red",
+      "status": "planned"
+    },
+    {
+      "id": "port-check",
+      "category": "net",
+      "path": "net/port-check",
+      "base": [
+        "nc",
+        "ss"
+      ],
+      "description": "Comprobar si un puerto está abierto/escuchando",
+      "status": "planned"
+    },
+    {
+      "id": "wait-for",
+      "category": "net",
+      "path": "net/wait-for",
+      "base": [
+        "wait-for-it",
+        "nc"
+      ],
+      "description": "Esperar a que un host:puerto responda",
+      "status": "planned"
+    },
+    {
+      "id": "tls-inspect",
+      "category": "net",
+      "path": "net/tls-inspect",
+      "base": [
+        "openssl"
+      ],
+      "description": "Inspeccionar/verificar certificado y handshake TLS",
+      "status": "planned"
+    },
+    {
+      "id": "whois-lookup",
+      "category": "net",
+      "path": "net/whois-lookup",
+      "base": [
+        "whois"
+      ],
+      "description": "Datos de dominio/IP",
+      "status": "planned"
+    },
+    {
+      "id": "http-status",
+      "category": "net",
+      "path": "net/http-status",
+      "base": [
+        "curl"
+      ],
+      "description": "Estado/cabeceras/redirecciones de una URL",
+      "status": "planned"
+    },
+    {
+      "id": "ssh-run",
+      "category": "net",
+      "path": "net/ssh-run",
+      "base": [
+        "ssh"
+      ],
+      "description": "Ejecutar comando remoto o abrir túnel",
+      "status": "planned"
+    },
+    {
+      "id": "rsync-remote",
+      "category": "net",
+      "path": "net/rsync-remote",
+      "base": [
+        "rsync"
+      ],
+      "description": "Copiar a/desde un host remoto",
+      "status": "planned"
+    },
+    {
+      "id": "git-clone",
+      "category": "vcs",
+      "path": "vcs/git-clone",
+      "base": [
+        "git"
+      ],
+      "description": "Clonar (shallow / sparse checkout)",
+      "status": "planned"
+    },
+    {
+      "id": "git-status",
+      "category": "vcs",
+      "path": "vcs/git-status",
+      "base": [
+        "git"
+      ],
+      "description": "Estado / diff / log resumido",
+      "status": "planned"
+    },
+    {
+      "id": "git-commit",
+      "category": "vcs",
+      "path": "vcs/git-commit",
+      "base": [
+        "git"
+      ],
+      "description": "Commit con mensaje (Conventional Commits)",
+      "status": "planned"
+    },
+    {
+      "id": "git-branch",
+      "category": "vcs",
+      "path": "vcs/git-branch",
+      "base": [
+        "git"
+      ],
+      "description": "Crear/cambiar/limpiar ramas",
+      "status": "planned"
+    },
+    {
+      "id": "git-blame",
+      "category": "vcs",
+      "path": "vcs/git-blame",
+      "base": [
+        "git"
+      ],
+      "description": "Autoría por línea o rango",
+      "status": "planned"
+    },
+    {
+      "id": "git-history",
+      "category": "vcs",
+      "path": "vcs/git-history",
+      "base": [
+        "git"
+      ],
+      "description": "Log gráfico o por fichero",
+      "status": "planned"
+    },
+    {
+      "id": "git-rewrite",
+      "category": "vcs",
+      "path": "vcs/git-rewrite",
+      "base": [
+        "git-filter-repo"
+      ],
+      "description": "Reescribir/filtrar historial",
+      "status": "planned"
+    },
+    {
+      "id": "conventional-commit",
+      "category": "vcs",
+      "path": "vcs/conventional-commit",
+      "base": [
+        "commitlint",
+        "commitizen"
+      ],
+      "description": "Validar/generar mensajes Conventional Commits",
+      "status": "planned"
+    },
+    {
+      "id": "changelog-gen",
+      "category": "vcs",
+      "path": "vcs/changelog-gen",
+      "base": [
+        "git-cliff"
+      ],
+      "description": "Generar CHANGELOG desde commits/tags",
+      "status": "planned"
+    },
+    {
+      "id": "hg-tool",
+      "category": "vcs",
+      "path": "vcs/hg-tool",
+      "base": [
+        "hg"
+      ],
+      "description": "Clonar/log/commit en Mercurial",
+      "status": "planned"
+    },
+    {
+      "id": "svn-tool",
+      "category": "vcs",
+      "path": "vcs/svn-tool",
+      "base": [
+        "svn"
+      ],
+      "description": "Checkout/diff/commit en Subversion",
+      "status": "planned"
+    },
+    {
+      "id": "repo-stats",
+      "category": "vcs",
+      "path": "vcs/repo-stats",
+      "base": [
+        "git-quick-stats"
+      ],
+      "description": "Métricas de actividad y contribuidores",
+      "status": "planned"
+    },
+    {
+      "id": "gh-repo",
+      "category": "forges",
+      "path": "forges/gh-repo",
+      "base": [
+        "gh"
+      ],
+      "description": "Crear/clonar/ver repos de GitHub",
+      "status": "planned"
+    },
+    {
+      "id": "gh-issue",
+      "category": "forges",
+      "path": "forges/gh-issue",
+      "base": [
+        "gh"
+      ],
+      "description": "Gestionar issues de GitHub (list/view/create/comment/close/reopen)",
+      "status": "implemented",
+      "lang": "bash",
+      "subcommands": [
+        "list",
+        "view",
+        "create",
+        "comment",
+        "close",
+        "reopen"
+      ],
+      "env": [
+        "GH_TOKEN",
+        "GITHUB_TOKEN"
+      ],
+      "flags": [
+        "--repo",
+        "--json",
+        "--dry-run",
+        "--state",
+        "--limit",
+        "--label",
+        "--title",
+        "--body"
+      ],
+      "notes": "--dry-run imprime el comando exacto y no requiere 'gh' ni token",
+      "usage": "gh-issue list -R owner/repo -s open --json"
+    },
+    {
+      "id": "gh-pr",
+      "category": "forges",
+      "path": "forges/gh-pr",
+      "base": [
+        "gh"
+      ],
+      "description": "Abrir/revisar/mergear pull requests",
+      "status": "planned"
+    },
+    {
+      "id": "gh-release",
+      "category": "forges",
+      "path": "forges/gh-release",
+      "base": [
+        "gh"
+      ],
+      "description": "Crear releases y subir artefactos",
+      "status": "planned"
+    },
+    {
+      "id": "gh-workflow",
+      "category": "forges",
+      "path": "forges/gh-workflow",
+      "base": [
+        "gh"
+      ],
+      "description": "Disparar/ver runs de GitHub Actions",
+      "status": "planned"
+    },
+    {
+      "id": "gh-api",
+      "category": "forges",
+      "path": "forges/gh-api",
+      "base": [
+        "gh"
+      ],
+      "description": "Llamadas REST/GraphQL autenticadas a GitHub",
+      "status": "planned"
+    },
+    {
+      "id": "glab-mr",
+      "category": "forges",
+      "path": "forges/glab-mr",
+      "base": [
+        "glab"
+      ],
+      "description": "Merge requests en GitLab",
+      "status": "planned"
+    },
+    {
+      "id": "glab-issue",
+      "category": "forges",
+      "path": "forges/glab-issue",
+      "base": [
+        "glab"
+      ],
+      "description": "Issues en GitLab",
+      "status": "planned"
+    },
+    {
+      "id": "glab-ci",
+      "category": "forges",
+      "path": "forges/glab-ci",
+      "base": [
+        "glab"
+      ],
+      "description": "Pipelines de GitLab CI",
+      "status": "planned"
+    },
+    {
+      "id": "gitea-api",
+      "category": "forges",
+      "path": "forges/gitea-api",
+      "base": [
+        "curl"
+      ],
+      "description": "Operaciones contra Gitea/Forgejo vía API",
+      "status": "planned"
+    },
+    {
+      "id": "bitbucket-api",
+      "category": "forges",
+      "path": "forges/bitbucket-api",
+      "base": [
+        "curl"
+      ],
+      "description": "Operaciones contra Bitbucket vía API",
+      "status": "planned"
+    },
+    {
+      "id": "repo-mirror",
+      "category": "forges",
+      "path": "forges/repo-mirror",
+      "base": [
+        "git"
+      ],
+      "description": "Mirror/push entre remotos",
+      "status": "planned"
+    },
+    {
+      "id": "py-install",
+      "category": "pkg",
+      "path": "pkg/py-install",
+      "base": [
+        "uv",
+        "pipx",
+        "pip"
+      ],
+      "description": "Instalar dependencias Python aisladas y rápidas",
+      "status": "planned"
+    },
+    {
+      "id": "node-install",
+      "category": "pkg",
+      "path": "pkg/node-install",
+      "base": [
+        "pnpm",
+        "npm",
+        "yarn"
+      ],
+      "description": "Instalar dependencias Node",
+      "status": "planned"
+    },
+    {
+      "id": "rust-build",
+      "category": "pkg",
+      "path": "pkg/rust-build",
+      "base": [
+        "cargo"
+      ],
+      "description": "Compilar/test en Rust",
+      "status": "planned"
+    },
+    {
+      "id": "apt-install",
+      "category": "pkg",
+      "path": "pkg/apt-install",
+      "base": [
+        "apt-get"
+      ],
+      "description": "Instalar paquetes de sistema",
+      "status": "planned"
+    },
+    {
+      "id": "dep-audit",
+      "category": "pkg",
+      "path": "pkg/dep-audit",
+      "base": [
+        "pip-audit",
+        "npm",
+        "osv-scanner"
+      ],
+      "description": "Auditar vulnerabilidades de dependencias",
+      "status": "planned"
+    },
+    {
+      "id": "lock-diff",
+      "category": "pkg",
+      "path": "pkg/lock-diff",
+      "base": [
+        "git",
+        "jq"
+      ],
+      "description": "Comparar cambios en lockfiles",
+      "status": "planned"
+    },
+    {
+      "id": "venv-setup",
+      "category": "pkg",
+      "path": "pkg/venv-setup",
+      "base": [
+        "uv",
+        "python"
+      ],
+      "description": "Crear/activar un entorno virtual",
+      "status": "planned"
+    },
+    {
+      "id": "sqlite-query",
+      "category": "data",
+      "path": "data/sqlite-query",
+      "base": [
+        "sqlite3"
+      ],
+      "description": "Ejecutar SQL sobre SQLite y formatear la salida",
+      "status": "planned"
+    },
+    {
+      "id": "psql-query",
+      "category": "data",
+      "path": "data/psql-query",
+      "base": [
+        "psql"
+      ],
+      "description": "Consultar PostgreSQL",
+      "status": "planned"
+    },
+    {
+      "id": "mysql-query",
+      "category": "data",
+      "path": "data/mysql-query",
+      "base": [
+        "mysql"
+      ],
+      "description": "Consultar MySQL/MariaDB",
+      "status": "planned"
+    },
+    {
+      "id": "redis-cmd",
+      "category": "data",
+      "path": "data/redis-cmd",
+      "base": [
+        "redis-cli"
+      ],
+      "description": "Operaciones sobre Redis",
+      "status": "planned"
+    },
+    {
+      "id": "mongo-query",
+      "category": "data",
+      "path": "data/mongo-query",
+      "base": [
+        "mongosh"
+      ],
+      "description": "Consultar MongoDB",
+      "status": "planned"
+    },
+    {
+      "id": "db-dump",
+      "category": "data",
+      "path": "data/db-dump",
+      "base": [
+        "pg_dump",
+        "mysqldump"
+      ],
+      "description": "Backup/restore de base de datos",
+      "status": "planned"
+    },
+    {
+      "id": "data-profile",
+      "category": "data",
+      "path": "data/data-profile",
+      "base": [
+        "duckdb",
+        "pandas"
+      ],
+      "description": "Estadísticas rápidas de CSV/parquet",
+      "status": "planned"
+    },
+    {
+      "id": "sql-format",
+      "category": "data",
+      "path": "data/sql-format",
+      "base": [
+        "sqlfluff"
+      ],
+      "description": "Formatear/validar/lint SQL",
+      "status": "planned"
+    },
+    {
+      "id": "base-encode",
+      "category": "crypto",
+      "path": "crypto/base-encode",
+      "base": [
+        "base64",
+        "xxd"
+      ],
+      "description": "base64 / hex encode-decode",
+      "status": "planned"
+    },
+    {
+      "id": "hash-file",
+      "category": "crypto",
+      "path": "crypto/hash-file",
+      "base": [
+        "sha256sum"
+      ],
+      "description": "Calcular/verificar checksums",
+      "status": "planned"
+    },
+    {
+      "id": "openssl-enc",
+      "category": "crypto",
+      "path": "crypto/openssl-enc",
+      "base": [
+        "openssl"
+      ],
+      "description": "Cifrar/descifrar/firmar",
+      "status": "planned"
+    },
+    {
+      "id": "gpg-tool",
+      "category": "crypto",
+      "path": "crypto/gpg-tool",
+      "base": [
+        "gpg"
+      ],
+      "description": "Cifrado y firma GPG",
+      "status": "planned"
+    },
+    {
+      "id": "jwt-decode",
+      "category": "crypto",
+      "path": "crypto/jwt-decode",
+      "base": [
+        "jwt-cli",
+        "jq"
+      ],
+      "description": "Decodificar/validar JWT",
+      "status": "planned"
+    },
+    {
+      "id": "uuid-gen",
+      "category": "crypto",
+      "path": "crypto/uuid-gen",
+      "base": [
+        "uuidgen"
+      ],
+      "description": "Generar UUID/ULID",
+      "status": "planned"
+    },
+    {
+      "id": "secret-gen",
+      "category": "crypto",
+      "path": "crypto/secret-gen",
+      "base": [
+        "openssl",
+        "pwgen"
+      ],
+      "description": "Generar contraseñas/tokens seguros",
+      "status": "planned"
+    },
+    {
+      "id": "redact-secrets",
+      "category": "crypto",
+      "path": "crypto/redact-secrets",
+      "base": [
+        "gitleaks"
+      ],
+      "description": "Detectar/enmascarar secretos en texto o logs",
+      "status": "planned"
+    },
+    {
+      "id": "env-secrets",
+      "category": "crypto",
+      "path": "crypto/env-secrets",
+      "base": [
+        "dotenv"
+      ],
+      "description": "Cargar secretos desde .env de forma segura",
+      "status": "planned"
+    },
+    {
+      "id": "run-bg",
+      "category": "proc",
+      "path": "proc/run-bg",
+      "base": [
+        "setsid",
+        "nohup"
+      ],
+      "description": "Lanzar proceso en background con PID y log",
+      "status": "planned"
+    },
+    {
+      "id": "retry",
+      "category": "proc",
+      "path": "proc/retry",
+      "base": [
+        "retry"
+      ],
+      "description": "Reintentar un comando con backoff",
+      "status": "planned"
+    },
+    {
+      "id": "timeout-cmd",
+      "category": "proc",
+      "path": "proc/timeout-cmd",
+      "base": [
+        "timeout"
+      ],
+      "description": "Limitar la duración de un comando",
+      "status": "planned"
+    },
+    {
+      "id": "parallel-run",
+      "category": "proc",
+      "path": "proc/parallel-run",
+      "base": [
+        "parallel",
+        "xargs"
+      ],
+      "description": "Ejecutar tareas en paralelo",
+      "status": "planned"
+    },
+    {
+      "id": "env-manager",
+      "category": "proc",
+      "path": "proc/env-manager",
+      "base": [
+        "direnv"
+      ],
+      "description": "Gestionar variables/entorno por proyecto",
+      "status": "planned"
+    },
+    {
+      "id": "proc-info",
+      "category": "proc",
+      "path": "proc/proc-info",
+      "base": [
+        "ps",
+        "procps"
+      ],
+      "description": "Snapshot de procesos y recursos",
+      "status": "planned"
+    },
+    {
+      "id": "schedule",
+      "category": "proc",
+      "path": "proc/schedule",
+      "base": [
+        "cron",
+        "at"
+      ],
+      "description": "Programar tareas",
+      "status": "planned"
+    },
+    {
+      "id": "log-tail",
+      "category": "proc",
+      "path": "proc/log-tail",
+      "base": [
+        "lnav",
+        "tail"
+      ],
+      "description": "Seguir/filtrar logs con color y navegación",
+      "status": "planned"
+    },
+    {
+      "id": "lint-py",
+      "category": "quality",
+      "path": "quality/lint-py",
+      "base": [
+        "ruff",
+        "black"
+      ],
+      "description": "Formatear y lint de Python",
+      "status": "planned"
+    },
+    {
+      "id": "lint-js",
+      "category": "quality",
+      "path": "quality/lint-js",
+      "base": [
+        "eslint",
+        "prettier"
+      ],
+      "description": "Formatear y lint de JS/TS",
+      "status": "planned"
+    },
+    {
+      "id": "run-tests",
+      "category": "quality",
+      "path": "quality/run-tests",
+      "base": [
+        "pytest",
+        "jest"
+      ],
+      "description": "Ejecutar suites de test",
+      "status": "planned"
+    },
+    {
+      "id": "coverage",
+      "category": "quality",
+      "path": "quality/coverage",
+      "base": [
+        "coverage.py",
+        "nyc"
+      ],
+      "description": "Medir cobertura de tests",
+      "status": "planned"
+    },
+    {
+      "id": "type-check",
+      "category": "quality",
+      "path": "quality/type-check",
+      "base": [
+        "mypy",
+        "tsc"
+      ],
+      "description": "Comprobación de tipos",
+      "status": "planned"
+    },
+    {
+      "id": "sast-scan",
+      "category": "quality",
+      "path": "quality/sast-scan",
+      "base": [
+        "semgrep"
+      ],
+      "description": "Análisis estático de seguridad",
+      "status": "planned"
+    },
+    {
+      "id": "spell-check",
+      "category": "quality",
+      "path": "quality/spell-check",
+      "base": [
+        "codespell"
+      ],
+      "description": "Ortografía en código y docs",
+      "status": "planned"
+    },
+    {
+      "id": "api-call",
+      "category": "api",
+      "path": "api/api-call",
+      "base": [
+        "curl"
+      ],
+      "description": "Llamada REST autenticada (token desde entorno)",
+      "status": "planned"
+    },
+    {
+      "id": "api-paginate",
+      "category": "api",
+      "path": "api/api-paginate",
+      "base": [
+        "curl",
+        "jq"
+      ],
+      "description": "Recorrer endpoints paginados",
+      "status": "planned"
+    },
+    {
+      "id": "api-retry",
+      "category": "api",
+      "path": "api/api-retry",
+      "base": [
+        "curl"
+      ],
+      "description": "Reintentos/backoff ante 429/5xx",
+      "status": "planned"
+    },
+    {
+      "id": "normalize-response",
+      "category": "api",
+      "path": "api/normalize-response",
+      "base": [
+        "jq",
+        "miller"
+      ],
+      "description": "Pasar respuestas a JSON/CSV plano",
+      "status": "planned"
+    },
+    {
+      "id": "openapi-client",
+      "category": "api",
+      "path": "api/openapi-client",
+      "base": [
+        "openapi-generator"
+      ],
+      "description": "Generar un cliente desde una spec OpenAPI",
+      "status": "planned"
+    },
+    {
+      "id": "webhook-send",
+      "category": "api",
+      "path": "api/webhook-send",
+      "base": [
+        "curl"
+      ],
+      "description": "Enviar payloads a un webhook",
+      "status": "planned"
+    },
+    {
+      "id": "graphql-query",
+      "category": "api",
+      "path": "api/graphql-query",
+      "base": [
+        "curl",
+        "jq"
+      ],
+      "description": "Ejecutar consultas GraphQL",
+      "status": "planned"
+    },
+    {
+      "id": "aws-cli",
+      "category": "cloud",
+      "path": "cloud/aws-cli",
+      "base": [
+        "aws"
+      ],
+      "description": "Operaciones AWS",
+      "status": "planned"
+    },
+    {
+      "id": "gcloud-cli",
+      "category": "cloud",
+      "path": "cloud/gcloud-cli",
+      "base": [
+        "gcloud"
+      ],
+      "description": "Operaciones GCP",
+      "status": "planned"
+    },
+    {
+      "id": "az-cli",
+      "category": "cloud",
+      "path": "cloud/az-cli",
+      "base": [
+        "az"
+      ],
+      "description": "Operaciones Azure",
+      "status": "planned"
+    },
+    {
+      "id": "terraform",
+      "category": "cloud",
+      "path": "cloud/terraform",
+      "base": [
+        "terraform"
+      ],
+      "description": "Plan/apply de infraestructura como código",
+      "status": "planned"
+    },
+    {
+      "id": "ansible-run",
+      "category": "cloud",
+      "path": "cloud/ansible-run",
+      "base": [
+        "ansible-playbook"
+      ],
+      "description": "Ejecutar playbooks",
+      "status": "planned"
+    },
+    {
+      "id": "llm-call",
+      "category": "ai",
+      "path": "ai/llm-call",
+      "base": [
+        "curl",
+        "python"
+      ],
+      "description": "Llamada a un endpoint LLM compatible OpenAI/Anthropic (prompt, system, temperatura)",
+      "status": "implemented",
+      "lang": "python",
+      "runner": "python3",
+      "deps": [],
+      "env": [
+        "LLM_BASE_URL",
+        "LLM_MODEL",
+        "LLM_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY"
+      ],
+      "flags": [
+        "--file",
+        "--system",
+        "--api",
+        "--model",
+        "--base-url",
+        "--temperature",
+        "--max-tokens",
+        "--timeout",
+        "--retries",
+        "--json"
+      ],
+      "notes": "Solo stdlib (confianza TLS del sistema); OpenAI-compatible y Anthropic; reintentos ante 429/5xx",
+      "usage": "echo 'hola' | llm-call --model gpt-4o --json"
+    },
+    {
+      "id": "embed-text",
+      "category": "ai",
+      "path": "ai/embed-text",
+      "base": [
+        "sentence-transformers",
+        "curl"
+      ],
+      "description": "Generar embeddings de textos o ficheros",
+      "status": "planned"
+    },
+    {
+      "id": "vector-upsert",
+      "category": "ai",
+      "path": "ai/vector-upsert",
+      "base": [
+        "python"
+      ],
+      "description": "Insertar vectores con metadatos en Pinecone/Qdrant/pgvector",
+      "status": "planned"
+    },
+    {
+      "id": "vector-search",
+      "category": "ai",
+      "path": "ai/vector-search",
+      "base": [
+        "python"
+      ],
+      "description": "Búsqueda semántica en el índice vectorial",
+      "status": "planned"
+    },
+    {
+      "id": "rag-chunk",
+      "category": "ai",
+      "path": "ai/rag-chunk",
+      "base": [
+        "python"
+      ],
+      "description": "Trocear documentos en chunks con solape y metadatos para RAG",
+      "status": "planned"
+    },
+    {
+      "id": "tokens-count",
+      "category": "ai",
+      "path": "ai/tokens-count",
+      "base": [
+        "tiktoken"
+      ],
+      "description": "Contar tokens de un texto para un modelo dado",
+      "status": "planned"
+    },
+    {
+      "id": "whisper-transcribe",
+      "category": "ai",
+      "path": "ai/whisper-transcribe",
+      "base": [
+        "whisper.cpp",
+        "curl"
+      ],
+      "description": "Audio a texto con timestamps",
+      "status": "planned"
+    },
+    {
+      "id": "tts-speak",
+      "category": "ai",
+      "path": "ai/tts-speak",
+      "base": [
+        "curl"
+      ],
+      "description": "Texto a audio (voz, idioma, formato) vía Azure/Google/ElevenLabs",
+      "status": "planned"
+    },
+    {
+      "id": "image-caption",
+      "category": "ai",
+      "path": "ai/image-caption",
+      "base": [
+        "curl"
+      ],
+      "description": "Describir o extraer información de una imagen (visión)",
+      "status": "planned"
+    },
+    {
+      "id": "translate-text",
+      "category": "ai",
+      "path": "ai/translate-text",
+      "base": [
+        "curl",
+        "argos-translate"
+      ],
+      "description": "Traducir preservando formato Markdown/HTML",
+      "status": "planned"
+    },
+    {
+      "id": "moderation-check",
+      "category": "ai",
+      "path": "ai/moderation-check",
+      "base": [
+        "curl"
+      ],
+      "description": "Clasificar contenido contra políticas de seguridad",
+      "status": "planned"
+    },
+    {
+      "id": "ollama-tool",
+      "category": "ai",
+      "path": "ai/ollama-tool",
+      "base": [
+        "ollama"
+      ],
+      "description": "Descargar y ejecutar modelos locales",
+      "status": "planned"
+    },
+    {
+      "id": "hf-download",
+      "category": "ai",
+      "path": "ai/hf-download",
+      "base": [
+        "huggingface-cli"
+      ],
+      "description": "Descargar modelos/datasets de Hugging Face con filtros",
+      "status": "planned"
+    },
+    {
+      "id": "prompt-eval",
+      "category": "ai",
+      "path": "ai/prompt-eval",
+      "base": [
+        "promptfoo"
+      ],
+      "description": "Evaluar prompts contra casos de test con aserciones",
+      "status": "planned"
+    },
+    {
+      "id": "prom-query",
+      "category": "obs",
+      "path": "obs/prom-query",
+      "base": [
+        "promtool",
+        "curl"
+      ],
+      "description": "Consultas PromQL instantáneas o de rango",
+      "status": "planned"
+    },
+    {
+      "id": "loki-query",
+      "category": "obs",
+      "path": "obs/loki-query",
+      "base": [
+        "logcli"
+      ],
+      "description": "Consultas LogQL sobre Loki",
+      "status": "planned"
+    },
+    {
+      "id": "elastic-query",
+      "category": "obs",
+      "path": "obs/elastic-query",
+      "base": [
+        "curl"
+      ],
+      "description": "Buscar en Elasticsearch/OpenSearch (DSL o KQL)",
+      "status": "planned"
+    },
+    {
+      "id": "grafana-api",
+      "category": "obs",
+      "path": "obs/grafana-api",
+      "base": [
+        "curl"
+      ],
+      "description": "Dashboards, anotaciones y snapshots de Grafana",
+      "status": "planned"
+    },
+    {
+      "id": "alert-silence",
+      "category": "obs",
+      "path": "obs/alert-silence",
+      "base": [
+        "amtool"
+      ],
+      "description": "Crear/listar/expirar silencios en Alertmanager",
+      "status": "planned"
+    },
+    {
+      "id": "jaeger-trace",
+      "category": "obs",
+      "path": "obs/jaeger-trace",
+      "base": [
+        "curl"
+      ],
+      "description": "Buscar y descargar trazas distribuidas",
+      "status": "planned"
+    },
+    {
+      "id": "otel-emit",
+      "category": "obs",
+      "path": "obs/otel-emit",
+      "base": [
+        "otel-cli"
+      ],
+      "description": "Emitir trazas/métricas/logs de prueba OTLP",
+      "status": "planned"
+    },
+    {
+      "id": "sentry-api",
+      "category": "obs",
+      "path": "obs/sentry-api",
+      "base": [
+        "sentry-cli"
+      ],
+      "description": "Issues, releases y sourcemaps en Sentry",
+      "status": "planned"
+    },
+    {
+      "id": "uptime-check",
+      "category": "obs",
+      "path": "obs/uptime-check",
+      "base": [
+        "curl"
+      ],
+      "description": "Disponibilidad de varios endpoints con umbrales y reporte",
+      "status": "planned"
+    },
+    {
+      "id": "metrics-scrape",
+      "category": "obs",
+      "path": "obs/metrics-scrape",
+      "base": [
+        "curl"
+      ],
+      "description": "Raspar un endpoint /metrics y convertirlo a JSON",
+      "status": "planned"
+    },
+    {
+      "id": "kafka-tool",
+      "category": "msg",
+      "path": "msg/kafka-tool",
+      "base": [
+        "kcat"
+      ],
+      "description": "Producir/consumir/inspeccionar topics y offsets",
+      "status": "planned"
+    },
+    {
+      "id": "rabbitmq-tool",
+      "category": "msg",
+      "path": "msg/rabbitmq-tool",
+      "base": [
+        "rabbitmqadmin"
+      ],
+      "description": "Publicar/consumir y gestionar colas y exchanges",
+      "status": "planned"
+    },
+    {
+      "id": "nats-tool",
+      "category": "msg",
+      "path": "msg/nats-tool",
+      "base": [
+        "nats"
+      ],
+      "description": "Pub/sub y streams JetStream",
+      "status": "planned"
+    },
+    {
+      "id": "mqtt-tool",
+      "category": "msg",
+      "path": "msg/mqtt-tool",
+      "base": [
+        "mosquitto_pub",
+        "mosquitto_sub"
+      ],
+      "description": "Publicar/suscribir MQTT (IoT)",
+      "status": "planned"
+    },
+    {
+      "id": "smtp-send",
+      "category": "msg",
+      "path": "msg/smtp-send",
+      "base": [
+        "msmtp",
+        "swaks"
+      ],
+      "description": "Enviar email con adjuntos/HTML contra cualquier SMTP",
+      "status": "planned"
+    },
+    {
+      "id": "imap-fetch",
+      "category": "msg",
+      "path": "msg/imap-fetch",
+      "base": [
+        "python"
+      ],
+      "description": "Leer/buscar/descargar de un buzón IMAP",
+      "status": "planned"
+    },
+    {
+      "id": "slack-post",
+      "category": "msg",
+      "path": "msg/slack-post",
+      "base": [
+        "curl"
+      ],
+      "description": "Mensajes y ficheros a Slack (webhook o API)",
+      "status": "planned"
+    },
+    {
+      "id": "telegram-send",
+      "category": "msg",
+      "path": "msg/telegram-send",
+      "base": [
+        "curl"
+      ],
+      "description": "Mensajes/ficheros vía bot de Telegram",
+      "status": "planned"
+    },
+    {
+      "id": "discord-post",
+      "category": "msg",
+      "path": "msg/discord-post",
+      "base": [
+        "curl"
+      ],
+      "description": "Webhook de Discord",
+      "status": "planned"
+    },
+    {
+      "id": "teams-post",
+      "category": "msg",
+      "path": "msg/teams-post",
+      "base": [
+        "curl"
+      ],
+      "description": "Webhook/Adaptive Cards de Teams",
+      "status": "planned"
+    },
+    {
+      "id": "sms-send",
+      "category": "msg",
+      "path": "msg/sms-send",
+      "base": [
+        "curl"
+      ],
+      "description": "SMS vía Twilio u otro proveedor",
+      "status": "planned"
+    },
+    {
+      "id": "push-notify",
+      "category": "msg",
+      "path": "msg/push-notify",
+      "base": [
+        "ntfy",
+        "gotify"
+      ],
+      "description": "Notificación push autoalojada",
+      "status": "planned"
+    },
+    {
+      "id": "ics-tool",
+      "category": "msg",
+      "path": "msg/ics-tool",
+      "base": [
+        "python"
+      ],
+      "description": "Crear/parsear eventos e invitaciones .ics",
+      "status": "planned"
+    },
+    {
+      "id": "s3-tool",
+      "category": "store",
+      "path": "store/s3-tool",
+      "base": [
+        "aws",
+        "mc"
+      ],
+      "description": "Subir/bajar/listar/presign en S3 y compatibles (MinIO)",
+      "status": "planned"
+    },
+    {
+      "id": "gcs-tool",
+      "category": "store",
+      "path": "store/gcs-tool",
+      "base": [
+        "gsutil"
+      ],
+      "description": "Operaciones en Google Cloud Storage",
+      "status": "planned"
+    },
+    {
+      "id": "azblob-tool",
+      "category": "store",
+      "path": "store/azblob-tool",
+      "base": [
+        "az"
+      ],
+      "description": "Operaciones en Azure Blob",
+      "status": "planned"
+    },
+    {
+      "id": "rclone-sync",
+      "category": "store",
+      "path": "store/rclone-sync",
+      "base": [
+        "rclone"
+      ],
+      "description": "Sincronizar con 70+ backends (Drive, FTP, S3, B2…)",
+      "status": "planned"
+    },
+    {
+      "id": "sftp-tool",
+      "category": "store",
+      "path": "store/sftp-tool",
+      "base": [
+        "lftp"
+      ],
+      "description": "Transferencias SFTP/FTPS scriptables con mirror",
+      "status": "planned"
+    },
+    {
+      "id": "webdav-tool",
+      "category": "store",
+      "path": "store/webdav-tool",
+      "base": [
+        "curl"
+      ],
+      "description": "Subir/bajar vía WebDAV (Nextcloud, ownCloud)",
+      "status": "planned"
+    },
+    {
+      "id": "restic-backup",
+      "category": "store",
+      "path": "store/restic-backup",
+      "base": [
+        "restic"
+      ],
+      "description": "Backups cifrados y desduplicados, restore y prune",
+      "status": "planned"
+    },
+    {
+      "id": "snapshot-dir",
+      "category": "store",
+      "path": "store/snapshot-dir",
+      "base": [
+        "tar",
+        "rsync"
+      ],
+      "description": "Snapshot incremental de un directorio con retención",
+      "status": "planned"
+    },
+    {
+      "id": "kestra-flow",
+      "category": "orch",
+      "path": "orch/kestra-flow",
+      "base": [
+        "kestra",
+        "curl"
+      ],
+      "description": "Validar/desplegar/ejecutar flujos de Kestra y seguir ejecuciones",
+      "status": "implemented",
+      "lang": "bash",
+      "subcommands": [
+        "validate",
+        "deploy",
+        "execute",
+        "status",
+        "logs",
+        "list"
+      ],
+      "env": [
+        "KESTRA_URL",
+        "KESTRA_TENANT",
+        "KESTRA_API_TOKEN",
+        "KESTRA_USER",
+        "KESTRA_PASSWORD"
+      ],
+      "flags": [
+        "--input",
+        "--wait",
+        "--wait-timeout",
+        "--json",
+        "--dry-run"
+      ],
+      "notes": "API REST; --wait sigue la ejecución hasta estado terminal; --dry-run no requiere servidor",
+      "usage": "kestra-flow execute prod etl --input fecha=2026-06-10 --wait"
+    },
+    {
+      "id": "airflow-dag",
+      "category": "orch",
+      "path": "orch/airflow-dag",
+      "base": [
+        "airflow",
+        "curl"
+      ],
+      "description": "Disparar DAGs, estado de runs, pausar/reanudar",
+      "status": "planned"
+    },
+    {
+      "id": "temporal-tool",
+      "category": "orch",
+      "path": "orch/temporal-tool",
+      "base": [
+        "temporal"
+      ],
+      "description": "Workflows y task queues de Temporal",
+      "status": "planned"
+    },
+    {
+      "id": "n8n-api",
+      "category": "orch",
+      "path": "orch/n8n-api",
+      "base": [
+        "curl"
+      ],
+      "description": "Activar workflows y consultar ejecuciones en n8n",
+      "status": "planned"
+    },
+    {
+      "id": "prefect-run",
+      "category": "orch",
+      "path": "orch/prefect-run",
+      "base": [
+        "prefect"
+      ],
+      "description": "Lanzar y monitorizar flows de Prefect",
+      "status": "planned"
+    },
+    {
+      "id": "json-schema-validate",
+      "category": "validate",
+      "path": "validate/json-schema-validate",
+      "base": [
+        "check-jsonschema"
+      ],
+      "description": "Validar JSON/YAML contra JSON Schema (salidas de agentes incluidas)",
+      "status": "implemented",
+      "lang": "python",
+      "runner": "uv run",
+      "deps": [
+        "jsonschema>=4.21",
+        "PyYAML>=6"
+      ],
+      "flags": [
+        "--schema",
+        "--json"
+      ],
+      "notes": "Valida JSON y YAML multi-documento; acepta '-' para stdin (salidas de agentes)",
+      "usage": "uv run validate/json-schema-validate salida.json --schema esquema.yaml"
+    },
+    {
+      "id": "openapi-lint",
+      "category": "validate",
+      "path": "validate/openapi-lint",
+      "base": [
+        "spectral",
+        "redocly"
+      ],
+      "description": "Lint y validación de especificaciones OpenAPI",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-validate",
+      "category": "validate",
+      "path": "validate/k8s-validate",
+      "base": [
+        "kubeconform"
+      ],
+      "description": "Validar manifiestos contra el esquema del clúster, offline",
+      "status": "planned"
+    },
+    {
+      "id": "kyverno-test",
+      "category": "validate",
+      "path": "validate/kyverno-test",
+      "base": [
+        "kyverno"
+      ],
+      "description": "Probar manifiestos contra políticas Kyverno antes de aplicar",
+      "status": "planned"
+    },
+    {
+      "id": "conftest-policy",
+      "category": "validate",
+      "path": "validate/conftest-policy",
+      "base": [
+        "conftest"
+      ],
+      "description": "Políticas OPA/Rego sobre cualquier configuración",
+      "status": "planned"
+    },
+    {
+      "id": "gha-lint",
+      "category": "validate",
+      "path": "validate/gha-lint",
+      "base": [
+        "actionlint"
+      ],
+      "description": "Lint de workflows de GitHub Actions",
+      "status": "planned"
+    },
+    {
+      "id": "ci-lint",
+      "category": "validate",
+      "path": "validate/ci-lint",
+      "base": [
+        "glab"
+      ],
+      "description": "Validar .gitlab-ci.yml contra la instancia",
+      "status": "planned"
+    },
+    {
+      "id": "compose-validate",
+      "category": "validate",
+      "path": "validate/compose-validate",
+      "base": [
+        "docker compose"
+      ],
+      "description": "Validar y resolver docker-compose con interpolación",
+      "status": "planned"
+    },
+    {
+      "id": "regex-test",
+      "category": "validate",
+      "path": "validate/regex-test",
+      "base": [
+        "python"
+      ],
+      "description": "Probar una regex contra muestras con grupos explicados",
+      "status": "planned"
+    },
+    {
+      "id": "format-validate",
+      "category": "validate",
+      "path": "validate/format-validate",
+      "base": [
+        "python"
+      ],
+      "description": "Validadores de formato (email, URL, IBAN, UUID, semver…)",
+      "status": "planned"
+    },
+    {
+      "id": "container-scan",
+      "category": "sec",
+      "path": "sec/container-scan",
+      "base": [
+        "trivy",
+        "grype"
+      ],
+      "description": "CVEs en imágenes, filesystems y repos",
+      "status": "implemented",
+      "lang": "bash",
+      "tools": [
+        "trivy",
+        "grype"
+      ],
+      "flags": [
+        "--fs",
+        "--severity",
+        "--tool",
+        "--ignore-unfixed",
+        "--json",
+        "--dry-run"
+      ],
+      "notes": "Autodetecta trivy (preferido) o grype; umbral de severidad; exit 1 si hay vulnerabilidades; --dry-run sin la herramienta",
+      "usage": "container-scan registry.local/api:latest --severity CRITICAL,HIGH"
+    },
+    {
+      "id": "sbom-gen",
+      "category": "sec",
+      "path": "sec/sbom-gen",
+      "base": [
+        "syft"
+      ],
+      "description": "Generar SBOM (SPDX/CycloneDX) de imagen o proyecto",
+      "status": "planned"
+    },
+    {
+      "id": "image-sign",
+      "category": "sec",
+      "path": "sec/image-sign",
+      "base": [
+        "cosign"
+      ],
+      "description": "Firmar y verificar imágenes y artefactos",
+      "status": "planned"
+    },
+    {
+      "id": "iac-scan",
+      "category": "sec",
+      "path": "sec/iac-scan",
+      "base": [
+        "checkov",
+        "tfsec"
+      ],
+      "description": "Malas configuraciones en Terraform/K8s/Dockerfile",
+      "status": "planned"
+    },
+    {
+      "id": "secret-scan",
+      "category": "sec",
+      "path": "sec/secret-scan",
+      "base": [
+        "gitleaks",
+        "trufflehog"
+      ],
+      "description": "Secretos en el working tree y en el historial git",
+      "status": "implemented",
+      "lang": "bash",
+      "tools": [
+        "gitleaks",
+        "trufflehog"
+      ],
+      "flags": [
+        "--git-history",
+        "--tool",
+        "--only-verified",
+        "--json",
+        "--dry-run"
+      ],
+      "notes": "Autodetecta gitleaks (preferido) o trufflehog; exit 1 si hay hallazgos (apto para CI); --dry-run sin la herramienta",
+      "usage": "secret-scan . --git-history --json"
+    },
+    {
+      "id": "dep-licenses",
+      "category": "sec",
+      "path": "sec/dep-licenses",
+      "base": [
+        "pip-licenses",
+        "license-checker"
+      ],
+      "description": "Informe de licencias de dependencias con allowlist",
+      "status": "planned"
+    },
+    {
+      "id": "cve-lookup",
+      "category": "sec",
+      "path": "sec/cve-lookup",
+      "base": [
+        "curl"
+      ],
+      "description": "Detalles y severidad de un CVE/GHSA/OSV por id",
+      "status": "planned"
+    },
+    {
+      "id": "bench-cmd",
+      "category": "bench",
+      "path": "bench/bench-cmd",
+      "base": [
+        "hyperfine"
+      ],
+      "description": "Benchmark estadístico de comandos con comparativa",
+      "status": "planned"
+    },
+    {
+      "id": "http-load",
+      "category": "bench",
+      "path": "bench/http-load",
+      "base": [
+        "k6",
+        "hey"
+      ],
+      "description": "Carga HTTP con umbrales de fallo y percentiles",
+      "status": "planned"
+    },
+    {
+      "id": "net-bench",
+      "category": "bench",
+      "path": "bench/net-bench",
+      "base": [
+        "iperf3"
+      ],
+      "description": "Ancho de banda y jitter entre hosts",
+      "status": "planned"
+    },
+    {
+      "id": "disk-bench",
+      "category": "bench",
+      "path": "bench/disk-bench",
+      "base": [
+        "fio"
+      ],
+      "description": "IOPS y throughput de disco",
+      "status": "planned"
+    },
+    {
+      "id": "py-profile",
+      "category": "bench",
+      "path": "bench/py-profile",
+      "base": [
+        "py-spy"
+      ],
+      "description": "Perfilado de procesos Python en ejecución, sin reiniciar",
+      "status": "planned"
+    },
+    {
+      "id": "flamegraph",
+      "category": "bench",
+      "path": "bench/flamegraph",
+      "base": [
+        "perf",
+        "flamegraph"
+      ],
+      "description": "Flamegraphs de CPU de cualquier proceso",
+      "status": "planned"
+    },
+    {
+      "id": "file-split",
+      "category": "fs",
+      "path": "fs/file-split",
+      "base": [
+        "split",
+        "cat"
+      ],
+      "description": "Trocear ficheros grandes y recomponerlos con verificación",
+      "status": "planned"
+    },
+    {
+      "id": "compare-dirs",
+      "category": "fs",
+      "path": "fs/compare-dirs",
+      "base": [
+        "diff",
+        "rsync"
+      ],
+      "description": "Diff recursivo entre directorios con resumen por estado",
+      "status": "planned"
+    },
+    {
+      "id": "checksum-tree",
+      "category": "fs",
+      "path": "fs/checksum-tree",
+      "base": [
+        "sha256sum",
+        "b3sum"
+      ],
+      "description": "Manifiesto de hashes de un árbol y verificación",
+      "status": "planned"
+    },
+    {
+      "id": "symlink-tool",
+      "category": "fs",
+      "path": "fs/symlink-tool",
+      "base": [
+        "ln",
+        "find"
+      ],
+      "description": "Crear, resolver y auditar enlaces simbólicos rotos",
+      "status": "planned"
+    },
+    {
+      "id": "file-meta",
+      "category": "fs",
+      "path": "fs/file-meta",
+      "base": [
+        "stat"
+      ],
+      "description": "Metadatos completos de fichero (stat) en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "shred-secure",
+      "category": "fs",
+      "path": "fs/shred-secure",
+      "base": [
+        "shred"
+      ],
+      "description": "Borrado irrecuperable de ficheros sensibles",
+      "status": "planned"
+    },
+    {
+      "id": "temp-workspace",
+      "category": "fs",
+      "path": "fs/temp-workspace",
+      "base": [
+        "mktemp"
+      ],
+      "description": "Workspace temporal con limpieza automática al salir",
+      "status": "planned"
+    },
+    {
+      "id": "markdown-tool",
+      "category": "text",
+      "path": "text/markdown-tool",
+      "base": [
+        "mdformat",
+        "pandoc"
+      ],
+      "description": "TOC, numeración de headers y md a HTML",
+      "status": "planned"
+    },
+    {
+      "id": "frontmatter-tool",
+      "category": "text",
+      "path": "text/frontmatter-tool",
+      "base": [
+        "python-frontmatter"
+      ],
+      "description": "Leer/editar frontmatter YAML (clave para SKILL.md)",
+      "status": "planned"
+    },
+    {
+      "id": "table-convert",
+      "category": "text",
+      "path": "text/table-convert",
+      "base": [
+        "python",
+        "miller"
+      ],
+      "description": "CSV/TSV a tabla Markdown alineada y viceversa",
+      "status": "planned"
+    },
+    {
+      "id": "jsonl-tool",
+      "category": "text",
+      "path": "text/jsonl-tool",
+      "base": [
+        "jq",
+        "python"
+      ],
+      "description": "Split/sample/merge/validar NDJSON línea a línea",
+      "status": "planned"
+    },
+    {
+      "id": "slugify",
+      "category": "text",
+      "path": "text/slugify",
+      "base": [
+        "python"
+      ],
+      "description": "Normalizar cadenas a slugs seguros para rutas/URLs",
+      "status": "planned"
+    },
+    {
+      "id": "string-case",
+      "category": "text",
+      "path": "text/string-case",
+      "base": [
+        "python"
+      ],
+      "description": "Conversión camel/snake/kebab/title en lote",
+      "status": "planned"
+    },
+    {
+      "id": "sort-versions",
+      "category": "text",
+      "path": "text/sort-versions",
+      "base": [
+        "sort",
+        "python"
+      ],
+      "description": "Ordenar listas de versiones con semántica semver",
+      "status": "planned"
+    },
+    {
+      "id": "ini-tool",
+      "category": "text",
+      "path": "text/ini-tool",
+      "base": [
+        "crudini"
+      ],
+      "description": "Leer/editar ficheros INI y .properties",
+      "status": "planned"
+    },
+    {
+      "id": "diagram-render",
+      "category": "docs",
+      "path": "docs/diagram-render",
+      "base": [
+        "mmdc",
+        "plantuml",
+        "d2",
+        "dot"
+      ],
+      "description": "Mermaid/PlantUML/D2/Graphviz a SVG/PNG",
+      "status": "planned"
+    },
+    {
+      "id": "pdf-form-fill",
+      "category": "docs",
+      "path": "docs/pdf-form-fill",
+      "base": [
+        "pypdf",
+        "pdftk"
+      ],
+      "description": "Rellenar formularios PDF desde JSON",
+      "status": "planned"
+    },
+    {
+      "id": "docx-template",
+      "category": "docs",
+      "path": "docs/docx-template",
+      "base": [
+        "docxtpl"
+      ],
+      "description": "Rellenar plantillas docx con variables y tablas",
+      "status": "planned"
+    },
+    {
+      "id": "markdown-slides",
+      "category": "docs",
+      "path": "docs/markdown-slides",
+      "base": [
+        "marp-cli"
+      ],
+      "description": "Markdown a presentación HTML/PPTX",
+      "status": "planned"
+    },
+    {
+      "id": "subtitle-tool",
+      "category": "docs",
+      "path": "docs/subtitle-tool",
+      "base": [
+        "ffmpeg",
+        "python"
+      ],
+      "description": "Extraer/convertir/desplazar subtítulos SRT/VTT",
+      "status": "planned"
+    },
+    {
+      "id": "video-info",
+      "category": "docs",
+      "path": "docs/video-info",
+      "base": [
+        "ffprobe"
+      ],
+      "description": "Metadatos completos de medios en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "audio-normalize",
+      "category": "docs",
+      "path": "docs/audio-normalize",
+      "base": [
+        "ffmpeg"
+      ],
+      "description": "Normalización de loudness EBU R128",
+      "status": "planned"
+    },
+    {
+      "id": "audio-concat",
+      "category": "docs",
+      "path": "docs/audio-concat",
+      "base": [
+        "ffmpeg"
+      ],
+      "description": "Unir pistas de audio con crossfade y silencios",
+      "status": "planned"
+    },
+    {
+      "id": "qr-tool",
+      "category": "docs",
+      "path": "docs/qr-tool",
+      "base": [
+        "qrencode",
+        "zbar"
+      ],
+      "description": "Generar y leer códigos QR",
+      "status": "planned"
+    },
+    {
+      "id": "epub-tool",
+      "category": "docs",
+      "path": "docs/epub-tool",
+      "base": [
+        "pandoc",
+        "calibre"
+      ],
+      "description": "Crear/extraer/convertir EPUB",
+      "status": "planned"
+    },
+    {
+      "id": "registry-tool",
+      "category": "containers",
+      "path": "containers/registry-tool",
+      "base": [
+        "skopeo",
+        "crane"
+      ],
+      "description": "Copiar imágenes entre registries, listar tags e inspeccionar manifests sin docker",
+      "status": "planned"
+    },
+    {
+      "id": "image-layers",
+      "category": "containers",
+      "path": "containers/image-layers",
+      "base": [
+        "dive"
+      ],
+      "description": "Analizar capas, tamaño y desperdicio de una imagen",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-events",
+      "category": "containers",
+      "path": "containers/k8s-events",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Eventos del namespace ordenados y filtrados",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-top",
+      "category": "containers",
+      "path": "containers/k8s-top",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Uso real de CPU/memoria de pods y nodos en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-rbac-check",
+      "category": "containers",
+      "path": "containers/k8s-rbac-check",
+      "base": [
+        "kubectl"
+      ],
+      "description": "auth can-i para un usuario/SA y quién puede hacer qué",
+      "status": "implemented",
+      "lang": "bash",
+      "env": [
+        "KUBECTL"
+      ],
+      "flags": [
+        "--list",
+        "--namespace",
+        "--all-namespaces",
+        "--as",
+        "--as-group",
+        "--sa",
+        "--subresource",
+        "--name",
+        "--json"
+      ],
+      "notes": "auth can-i; soporta varios verbos, impersonación de usuario/SA y --list; KUBECTL=oc para OpenShift",
+      "usage": "k8s-rbac-check get,list,watch pods -n falcone --json"
+    },
+    {
+      "id": "k8s-cp",
+      "category": "containers",
+      "path": "containers/k8s-cp",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Copiar ficheros pod-local con verificación",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-debug",
+      "category": "containers",
+      "path": "containers/k8s-debug",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Contenedor efímero de depuración en un pod en marcha",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-wait",
+      "category": "containers",
+      "path": "containers/k8s-wait",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Esperar una condición de recurso con timeout",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-secret-tool",
+      "category": "containers",
+      "path": "containers/k8s-secret-tool",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Crear secrets desde .env/ficheros y decodificarlos",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-resources",
+      "category": "containers",
+      "path": "containers/k8s-resources",
+      "base": [
+        "kubectl",
+        "jq"
+      ],
+      "description": "Informe requests/limits vs uso real por namespace",
+      "status": "planned"
+    },
+    {
+      "id": "k8s-drain",
+      "category": "containers",
+      "path": "containers/k8s-drain",
+      "base": [
+        "kubectl"
+      ],
+      "description": "Cordon/drain seguro de nodos con confirmación",
+      "status": "planned"
+    },
+    {
+      "id": "argocd-app",
+      "category": "containers",
+      "path": "containers/argocd-app",
+      "base": [
+        "argocd"
+      ],
+      "description": "Sync, estado y diff de aplicaciones GitOps",
+      "status": "planned"
+    },
+    {
+      "id": "velero-backup",
+      "category": "containers",
+      "path": "containers/velero-backup",
+      "base": [
+        "velero"
+      ],
+      "description": "Backup/restore de namespaces del clúster",
+      "status": "planned"
+    },
+    {
+      "id": "rss-fetch",
+      "category": "web",
+      "path": "web/rss-fetch",
+      "base": [
+        "feedparser"
+      ],
+      "description": "Parsear feeds RSS/Atom a JSON con filtros de fecha",
+      "status": "planned"
+    },
+    {
+      "id": "sitemap-parse",
+      "category": "web",
+      "path": "web/sitemap-parse",
+      "base": [
+        "curl",
+        "python"
+      ],
+      "description": "Extraer y filtrar URLs de un sitemap.xml",
+      "status": "planned"
+    },
+    {
+      "id": "link-check",
+      "category": "web",
+      "path": "web/link-check",
+      "base": [
+        "lychee",
+        "curl"
+      ],
+      "description": "Detectar enlaces rotos en un sitio o documento",
+      "status": "planned"
+    },
+    {
+      "id": "robots-check",
+      "category": "web",
+      "path": "web/robots-check",
+      "base": [
+        "python"
+      ],
+      "description": "Comprobar si una ruta es rastreable según robots.txt",
+      "status": "planned"
+    },
+    {
+      "id": "http-serve",
+      "category": "web",
+      "path": "web/http-serve",
+      "base": [
+        "python"
+      ],
+      "description": "Servir un directorio local por HTTP (previews)",
+      "status": "planned"
+    },
+    {
+      "id": "api-mock",
+      "category": "web",
+      "path": "web/api-mock",
+      "base": [
+        "prism"
+      ],
+      "description": "Mock server desde una spec OpenAPI",
+      "status": "planned"
+    },
+    {
+      "id": "wayback-fetch",
+      "category": "web",
+      "path": "web/wayback-fetch",
+      "base": [
+        "curl"
+      ],
+      "description": "Recuperar snapshots históricos de archive.org",
+      "status": "planned"
+    },
+    {
+      "id": "media-fetch",
+      "category": "web",
+      "path": "web/media-fetch",
+      "base": [
+        "yt-dlp"
+      ],
+      "description": "Descargar vídeo/audio de plataformas con metadatos",
+      "status": "planned"
+    },
+    {
+      "id": "curl-timing",
+      "category": "net",
+      "path": "net/curl-timing",
+      "base": [
+        "curl"
+      ],
+      "description": "Desglose DNS/TCP/TLS/TTFB de una petición",
+      "status": "planned"
+    },
+    {
+      "id": "ip-info",
+      "category": "net",
+      "path": "net/ip-info",
+      "base": [
+        "curl"
+      ],
+      "description": "Geo, ASN y reverse DNS de una IP",
+      "status": "planned"
+    },
+    {
+      "id": "listen-report",
+      "category": "net",
+      "path": "net/listen-report",
+      "base": [
+        "ss"
+      ],
+      "description": "Qué proceso escucha en qué puerto, en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "net-scan",
+      "category": "net",
+      "path": "net/net-scan",
+      "base": [
+        "nmap"
+      ],
+      "description": "Descubrir hosts y puertos en infraestructura propia",
+      "status": "planned"
+    },
+    {
+      "id": "packet-capture",
+      "category": "net",
+      "path": "net/packet-capture",
+      "base": [
+        "tcpdump"
+      ],
+      "description": "Captura acotada (duración/filtro) para diagnóstico",
+      "status": "planned"
+    },
+    {
+      "id": "tunnel-expose",
+      "category": "net",
+      "path": "net/tunnel-expose",
+      "base": [
+        "cloudflared",
+        "tailscale"
+      ],
+      "description": "Exponer un puerto local a internet temporalmente",
+      "status": "planned"
+    },
+    {
+      "id": "mdns-discover",
+      "category": "net",
+      "path": "net/mdns-discover",
+      "base": [
+        "avahi-browse"
+      ],
+      "description": "Descubrir servicios en la LAN",
+      "status": "planned"
+    },
+    {
+      "id": "git-worktree",
+      "category": "vcs",
+      "path": "vcs/git-worktree",
+      "base": [
+        "git"
+      ],
+      "description": "Árboles de trabajo paralelos (agentes concurrentes)",
+      "status": "planned"
+    },
+    {
+      "id": "git-bisect",
+      "category": "vcs",
+      "path": "vcs/git-bisect",
+      "base": [
+        "git"
+      ],
+      "description": "Búsqueda binaria de regresiones, automatizable con run",
+      "status": "planned"
+    },
+    {
+      "id": "git-tag",
+      "category": "vcs",
+      "path": "vcs/git-tag",
+      "base": [
+        "git"
+      ],
+      "description": "Tags semver, firmados, con push controlado",
+      "status": "planned"
+    },
+    {
+      "id": "git-stash",
+      "category": "vcs",
+      "path": "vcs/git-stash",
+      "base": [
+        "git"
+      ],
+      "description": "Guardar/aplicar/listar cambios temporales",
+      "status": "planned"
+    },
+    {
+      "id": "git-submodule",
+      "category": "vcs",
+      "path": "vcs/git-submodule",
+      "base": [
+        "git"
+      ],
+      "description": "Añadir/actualizar/sincronizar submódulos",
+      "status": "planned"
+    },
+    {
+      "id": "git-hooks",
+      "category": "vcs",
+      "path": "vcs/git-hooks",
+      "base": [
+        "pre-commit"
+      ],
+      "description": "Instalar y ejecutar hooks gestionados",
+      "status": "planned"
+    },
+    {
+      "id": "git-archive",
+      "category": "vcs",
+      "path": "vcs/git-archive",
+      "base": [
+        "git"
+      ],
+      "description": "Exportar snapshot limpio (sin .git) a tar/zip",
+      "status": "planned"
+    },
+    {
+      "id": "monorepo-affected",
+      "category": "vcs",
+      "path": "vcs/monorepo-affected",
+      "base": [
+        "turbo",
+        "nx",
+        "git"
+      ],
+      "description": "Paquetes afectados por un diff para build selectivo",
+      "status": "planned"
+    },
+    {
+      "id": "gh-gist",
+      "category": "forges",
+      "path": "forges/gh-gist",
+      "base": [
+        "gh"
+      ],
+      "description": "Crear/listar/clonar gists",
+      "status": "planned"
+    },
+    {
+      "id": "gh-search",
+      "category": "forges",
+      "path": "forges/gh-search",
+      "base": [
+        "gh"
+      ],
+      "description": "Buscar código, issues y repos",
+      "status": "planned"
+    },
+    {
+      "id": "gh-secret",
+      "category": "forges",
+      "path": "forges/gh-secret",
+      "base": [
+        "gh"
+      ],
+      "description": "Secrets y variables de Actions por repo/org",
+      "status": "planned"
+    },
+    {
+      "id": "gh-project",
+      "category": "forges",
+      "path": "forges/gh-project",
+      "base": [
+        "gh"
+      ],
+      "description": "Items y campos de Projects v2",
+      "status": "planned"
+    },
+    {
+      "id": "gh-artifact",
+      "category": "forges",
+      "path": "forges/gh-artifact",
+      "base": [
+        "gh"
+      ],
+      "description": "Descargar artefactos y logs de runs",
+      "status": "planned"
+    },
+    {
+      "id": "codeowners-check",
+      "category": "forges",
+      "path": "forges/codeowners-check",
+      "base": [
+        "python"
+      ],
+      "description": "Validar CODEOWNERS y cobertura de rutas",
+      "status": "planned"
+    },
+    {
+      "id": "go-build",
+      "category": "pkg",
+      "path": "pkg/go-build",
+      "base": [
+        "go"
+      ],
+      "description": "Compilar/test/instalar módulos Go",
+      "status": "planned"
+    },
+    {
+      "id": "jvm-build",
+      "category": "pkg",
+      "path": "pkg/jvm-build",
+      "base": [
+        "mvn",
+        "gradle"
+      ],
+      "description": "Compilar/test proyectos Maven/Gradle",
+      "status": "planned"
+    },
+    {
+      "id": "php-composer",
+      "category": "pkg",
+      "path": "pkg/php-composer",
+      "base": [
+        "composer"
+      ],
+      "description": "Dependencias PHP",
+      "status": "planned"
+    },
+    {
+      "id": "ruby-bundle",
+      "category": "pkg",
+      "path": "pkg/ruby-bundle",
+      "base": [
+        "bundler"
+      ],
+      "description": "Dependencias Ruby",
+      "status": "planned"
+    },
+    {
+      "id": "mise-runtimes",
+      "category": "pkg",
+      "path": "pkg/mise-runtimes",
+      "base": [
+        "mise",
+        "asdf"
+      ],
+      "description": "Instalar/fijar versiones de runtimes por proyecto",
+      "status": "planned"
+    },
+    {
+      "id": "nix-shell",
+      "category": "pkg",
+      "path": "pkg/nix-shell",
+      "base": [
+        "nix"
+      ],
+      "description": "Entorno reproducible efímero con paquetes dados",
+      "status": "planned"
+    },
+    {
+      "id": "outdated-report",
+      "category": "pkg",
+      "path": "pkg/outdated-report",
+      "base": [
+        "npm",
+        "pip",
+        "cargo"
+      ],
+      "description": "Dependencias desactualizadas multi-ecosistema en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "pkg-publish",
+      "category": "pkg",
+      "path": "pkg/pkg-publish",
+      "base": [
+        "npm",
+        "twine"
+      ],
+      "description": "Publicar a npm/PyPI con verificaciones previas",
+      "status": "planned"
+    },
+    {
+      "id": "usql-query",
+      "category": "data",
+      "path": "data/usql-query",
+      "base": [
+        "usql"
+      ],
+      "description": "Cliente SQL universal (una interfaz, 20+ motores)",
+      "status": "planned"
+    },
+    {
+      "id": "db-migrate",
+      "category": "data",
+      "path": "data/db-migrate",
+      "base": [
+        "alembic",
+        "flyway",
+        "golang-migrate"
+      ],
+      "description": "Aplicar/revertir migraciones con estado",
+      "status": "planned"
+    },
+    {
+      "id": "db-schema-diff",
+      "category": "data",
+      "path": "data/db-schema-diff",
+      "base": [
+        "migra",
+        "atlas"
+      ],
+      "description": "Comparar esquemas entre dos bases",
+      "status": "planned"
+    },
+    {
+      "id": "db-seed",
+      "category": "data",
+      "path": "data/db-seed",
+      "base": [
+        "faker"
+      ],
+      "description": "Generar datos falsos coherentes para pruebas",
+      "status": "planned"
+    },
+    {
+      "id": "parquet-tool",
+      "category": "data",
+      "path": "data/parquet-tool",
+      "base": [
+        "pyarrow",
+        "duckdb"
+      ],
+      "description": "Inspeccionar/convertir Parquet y Arrow",
+      "status": "planned"
+    },
+    {
+      "id": "duckdb-sql",
+      "category": "data",
+      "path": "data/duckdb-sql",
+      "base": [
+        "duckdb"
+      ],
+      "description": "SQL analítico directo sobre CSV/Parquet/JSON",
+      "status": "planned"
+    },
+    {
+      "id": "xlsx-tool",
+      "category": "data",
+      "path": "data/xlsx-tool",
+      "base": [
+        "openpyxl"
+      ],
+      "description": "Leer/escribir/transformar Excel (hojas, rangos, fórmulas)",
+      "status": "implemented",
+      "lang": "python",
+      "runner": "uv run",
+      "deps": [
+        "openpyxl>=3.1"
+      ],
+      "subcommands": [
+        "info",
+        "sheets",
+        "csv",
+        "json"
+      ],
+      "flags": [
+        "--sheet",
+        "--no-header",
+        "--json"
+      ],
+      "notes": "--sheet por índice (1-based) o nombre; read-only y data_only",
+      "usage": "uv run data/xlsx-tool csv brd.xlsx --sheet Requisitos"
+    },
+    {
+      "id": "influx-query",
+      "category": "data",
+      "path": "data/influx-query",
+      "base": [
+        "influx"
+      ],
+      "description": "Consultas de series temporales",
+      "status": "planned"
+    },
+    {
+      "id": "sops-tool",
+      "category": "crypto",
+      "path": "crypto/sops-tool",
+      "base": [
+        "sops"
+      ],
+      "description": "Cifrar/descifrar ficheros de config con claves age/KMS",
+      "status": "planned"
+    },
+    {
+      "id": "age-encrypt",
+      "category": "crypto",
+      "path": "crypto/age-encrypt",
+      "base": [
+        "age"
+      ],
+      "description": "Cifrado moderno de ficheros, simple y scriptable",
+      "status": "planned"
+    },
+    {
+      "id": "vault-secret",
+      "category": "crypto",
+      "path": "crypto/vault-secret",
+      "base": [
+        "vault"
+      ],
+      "description": "Leer/escribir secretos en HashiCorp Vault",
+      "status": "planned"
+    },
+    {
+      "id": "cert-make",
+      "category": "crypto",
+      "path": "crypto/cert-make",
+      "base": [
+        "mkcert",
+        "openssl"
+      ],
+      "description": "Certificados autofirmados y CA local de desarrollo",
+      "status": "planned"
+    },
+    {
+      "id": "ssh-key-tool",
+      "category": "crypto",
+      "path": "crypto/ssh-key-tool",
+      "base": [
+        "ssh-keygen"
+      ],
+      "description": "Generar/convertir/fingerprint de claves SSH",
+      "status": "planned"
+    },
+    {
+      "id": "totp-gen",
+      "category": "crypto",
+      "path": "crypto/totp-gen",
+      "base": [
+        "oathtool"
+      ],
+      "description": "Códigos TOTP para automatizaciones con 2FA",
+      "status": "planned"
+    },
+    {
+      "id": "date-calc",
+      "category": "proc",
+      "path": "proc/date-calc",
+      "base": [
+        "dateutils",
+        "python"
+      ],
+      "description": "Sumar/restar fechas, diferencias y días laborables",
+      "status": "planned"
+    },
+    {
+      "id": "tz-convert",
+      "category": "proc",
+      "path": "proc/tz-convert",
+      "base": [
+        "python"
+      ],
+      "description": "Convertir horas entre zonas horarias",
+      "status": "planned"
+    },
+    {
+      "id": "cron-explain",
+      "category": "proc",
+      "path": "proc/cron-explain",
+      "base": [
+        "croniter"
+      ],
+      "description": "Validar expresiones cron y listar próximas ejecuciones",
+      "status": "planned"
+    },
+    {
+      "id": "sys-info",
+      "category": "proc",
+      "path": "proc/sys-info",
+      "base": [
+        "lshw",
+        "inxi"
+      ],
+      "description": "Inventario de hardware y SO en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "gpu-info",
+      "category": "proc",
+      "path": "proc/gpu-info",
+      "base": [
+        "nvidia-smi"
+      ],
+      "description": "Estado y memoria de GPUs en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "service-ctl",
+      "category": "proc",
+      "path": "proc/service-ctl",
+      "base": [
+        "systemctl"
+      ],
+      "description": "Gestionar servicios systemd de forma scriptable",
+      "status": "planned"
+    },
+    {
+      "id": "journal-query",
+      "category": "proc",
+      "path": "proc/journal-query",
+      "base": [
+        "journalctl"
+      ],
+      "description": "Consultar journald con filtros en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "term-record",
+      "category": "proc",
+      "path": "proc/term-record",
+      "base": [
+        "asciinema"
+      ],
+      "description": "Grabar sesiones de terminal (auditoría de agentes)",
+      "status": "planned"
+    },
+    {
+      "id": "lint-sh",
+      "category": "quality",
+      "path": "quality/lint-sh",
+      "base": [
+        "shellcheck",
+        "shfmt"
+      ],
+      "description": "Lint y formato de shell (los propios scripts del repo)",
+      "status": "planned"
+    },
+    {
+      "id": "lint-yaml",
+      "category": "quality",
+      "path": "quality/lint-yaml",
+      "base": [
+        "yamllint"
+      ],
+      "description": "Lint de YAML",
+      "status": "planned"
+    },
+    {
+      "id": "lint-docker",
+      "category": "quality",
+      "path": "quality/lint-docker",
+      "base": [
+        "hadolint"
+      ],
+      "description": "Lint de Dockerfiles",
+      "status": "planned"
+    },
+    {
+      "id": "lint-md",
+      "category": "quality",
+      "path": "quality/lint-md",
+      "base": [
+        "markdownlint"
+      ],
+      "description": "Lint de Markdown",
+      "status": "planned"
+    },
+    {
+      "id": "cloc",
+      "category": "quality",
+      "path": "quality/cloc",
+      "base": [
+        "tokei"
+      ],
+      "description": "Líneas de código por lenguaje en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "complexity-report",
+      "category": "quality",
+      "path": "quality/complexity-report",
+      "base": [
+        "radon",
+        "lizard"
+      ],
+      "description": "Complejidad ciclomática y mantenibilidad",
+      "status": "planned"
+    },
+    {
+      "id": "dead-code",
+      "category": "quality",
+      "path": "quality/dead-code",
+      "base": [
+        "vulture",
+        "knip"
+      ],
+      "description": "Código muerto en Python/JS",
+      "status": "planned"
+    },
+    {
+      "id": "todo-scan",
+      "category": "quality",
+      "path": "quality/todo-scan",
+      "base": [
+        "ripgrep",
+        "git"
+      ],
+      "description": "TODO/FIXME/HACK con contexto y autor en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "codemod",
+      "category": "quality",
+      "path": "quality/codemod",
+      "base": [
+        "ast-grep"
+      ],
+      "description": "Búsqueda y refactor estructural por patrones AST",
+      "status": "planned"
+    },
+    {
+      "id": "visual-diff",
+      "category": "quality",
+      "path": "quality/visual-diff",
+      "base": [
+        "imagemagick"
+      ],
+      "description": "Comparar imágenes/screenshots con umbral",
+      "status": "planned"
+    },
+    {
+      "id": "a11y-check",
+      "category": "quality",
+      "path": "quality/a11y-check",
+      "base": [
+        "pa11y",
+        "axe"
+      ],
+      "description": "Auditoría de accesibilidad de una URL",
+      "status": "planned"
+    },
+    {
+      "id": "lighthouse-audit",
+      "category": "quality",
+      "path": "quality/lighthouse-audit",
+      "base": [
+        "lighthouse"
+      ],
+      "description": "Rendimiento/SEO/buenas prácticas web en JSON",
+      "status": "planned"
+    },
+    {
+      "id": "grpc-call",
+      "category": "api",
+      "path": "api/grpc-call",
+      "base": [
+        "grpcurl"
+      ],
+      "description": "Invocar servicios gRPC con reflexión",
+      "status": "planned"
+    },
+    {
+      "id": "websocket-client",
+      "category": "api",
+      "path": "api/websocket-client",
+      "base": [
+        "websocat"
+      ],
+      "description": "Conectar, enviar y escuchar WebSockets",
+      "status": "planned"
+    },
+    {
+      "id": "sse-client",
+      "category": "api",
+      "path": "api/sse-client",
+      "base": [
+        "curl"
+      ],
+      "description": "Escuchar Server-Sent Events con filtros",
+      "status": "planned"
+    },
+    {
+      "id": "soap-call",
+      "category": "api",
+      "path": "api/soap-call",
+      "base": [
+        "zeep"
+      ],
+      "description": "Servicios SOAP/WSDL legacy",
+      "status": "planned"
+    },
+    {
+      "id": "jsonrpc-call",
+      "category": "api",
+      "path": "api/jsonrpc-call",
+      "base": [
+        "curl",
+        "jq"
+      ],
+      "description": "Llamadas JSON-RPC 2.0",
+      "status": "planned"
+    },
+    {
+      "id": "api-diff",
+      "category": "api",
+      "path": "api/api-diff",
+      "base": [
+        "oasdiff"
+      ],
+      "description": "Cambios incompatibles entre dos specs OpenAPI",
+      "status": "planned"
+    },
+    {
+      "id": "oauth-token",
+      "category": "api",
+      "path": "api/oauth-token",
+      "base": [
+        "curl"
+      ],
+      "description": "Tokens OAuth2 (client credentials, device) para Cognito/Keycloak",
+      "status": "implemented",
+      "lang": "bash",
+      "subcommands": [
+        "client_credentials",
+        "password",
+        "refresh_token",
+        "device"
+      ],
+      "env": [
+        "OAUTH_TOKEN_URL",
+        "OAUTH_CLIENT_ID",
+        "OAUTH_CLIENT_SECRET",
+        "OAUTH_DEVICE_URL"
+      ],
+      "flags": [
+        "--token-url",
+        "--client-id",
+        "--client-secret",
+        "--scope",
+        "--audience",
+        "--username",
+        "--password",
+        "--refresh-token",
+        "--device-url",
+        "--auth-basic",
+        "--interval",
+        "--device-timeout",
+        "--timeout",
+        "--json",
+        "--dry-run"
+      ],
+      "notes": "OAuth2 para Cognito/Keycloak/Auth0; imprime solo el access_token (componible); --dry-run enmascara secretos",
+      "usage": "TOKEN=\"$(oauth-token client_credentials --scope api/read --auth-basic)\""
+    },
+    {
+      "id": "stripe-tool",
+      "category": "api",
+      "path": "api/stripe-tool",
+      "base": [
+        "stripe"
+      ],
+      "description": "Disparar eventos de prueba y reenviar webhooks",
+      "status": "planned"
+    },
+    {
+      "id": "coolify-api",
+      "category": "cloud",
+      "path": "cloud/coolify-api",
+      "base": [
+        "curl"
+      ],
+      "description": "Despliegues y servicios vía API de Coolify",
+      "status": "implemented",
+      "lang": "bash",
+      "subcommands": [
+        "apps",
+        "app",
+        "services",
+        "databases",
+        "deployments",
+        "deploy",
+        "start",
+        "stop",
+        "restart"
+      ],
+      "env": [
+        "COOLIFY_URL",
+        "COOLIFY_TOKEN"
+      ],
+      "flags": [
+        "--force",
+        "--tag",
+        "--json",
+        "--dry-run"
+      ],
+      "notes": "API v4 de Coolify; operaciones de escritura (deploy/start/stop/restart) con --dry-run sin servidor",
+      "usage": "coolify-api deploy <uuid> --force"
+    },
+    {
+      "id": "cloudflare-tool",
+      "category": "cloud",
+      "path": "cloud/cloudflare-tool",
+      "base": [
+        "flarectl",
+        "curl"
+      ],
+      "description": "DNS, purga de caché y reglas en Cloudflare",
+      "status": "planned"
+    },
+    {
+      "id": "hetzner-cli",
+      "category": "cloud",
+      "path": "cloud/hetzner-cli",
+      "base": [
+        "hcloud"
+      ],
+      "description": "Servidores, volúmenes y firewalls en Hetzner",
+      "status": "planned"
+    },
+    {
+      "id": "do-cli",
+      "category": "cloud",
+      "path": "cloud/do-cli",
+      "base": [
+        "doctl"
+      ],
+      "description": "Recursos de DigitalOcean",
+      "status": "planned"
+    },
+    {
+      "id": "fly-deploy",
+      "category": "cloud",
+      "path": "cloud/fly-deploy",
+      "base": [
+        "flyctl"
+      ],
+      "description": "Desplegar y escalar en Fly.io",
+      "status": "planned"
+    },
+    {
+      "id": "paas-deploy",
+      "category": "cloud",
+      "path": "cloud/paas-deploy",
+      "base": [
+        "vercel",
+        "netlify"
+      ],
+      "description": "Desplegar a Vercel/Netlify",
+      "status": "planned"
+    },
+    {
+      "id": "infracost",
+      "category": "cloud",
+      "path": "cloud/infracost",
+      "base": [
+        "infracost"
+      ],
+      "description": "Coste estimado de un plan de Terraform",
+      "status": "planned"
+    },
+    {
+      "id": "pulumi-run",
+      "category": "cloud",
+      "path": "cloud/pulumi-run",
+      "base": [
+        "pulumi"
+      ],
+      "description": "IaC con Pulumi (up/preview/destroy)",
+      "status": "planned"
+    },
+    {
+      "id": "terragrunt-run",
+      "category": "cloud",
+      "path": "cloud/terragrunt-run",
+      "base": [
+        "terragrunt"
+      ],
+      "description": "Orquestar módulos Terraform multi-entorno",
+      "status": "planned"
+    }
+  ]
+}

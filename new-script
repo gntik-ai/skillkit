@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+#
+# new-script — Generar un script nuevo desde plantilla, siguiendo las
+# convenciones del repositorio. Imprime la ruta creada por stdout y los
+# siguientes pasos por stderr.
+#
+# exit: 0 ok · 1 destino ya existe / fallo · 2 uso incorrecto
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+new-script — Generar un script nuevo desde plantilla.
+
+Uso:
+  new-script CATEGORIA NOMBRE [bash|python] [opciones]
+
+Opciones:
+  -d, --description TXT   Descripción de una línea
+  -b, --base HERRAMIENTA  Herramienta base (p.ej. jq, docker, gh)
+  -h, --help              Esta ayuda
+
+Ejemplos:
+  new-script text json-query bash -d "Consultar/transformar JSON" -b jq
+  new-script api api-paginate python -d "Recorrer endpoints paginados"
+EOF
+}
+
+for arg in "$@"; do case "$arg" in -h|--help) usage; exit 0 ;; esac; done
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DESC="TODO: descripción"
+BASE="TODO"
+declare -a POS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -d|--description) DESC="$2"; shift 2 ;;
+    -b|--base)        BASE="$2"; shift 2 ;;
+    -*)               echo "[new-script] opción desconocida: $1" >&2; exit 2 ;;
+    *)                POS+=("$1"); shift ;;
+  esac
+done
+
+CAT="${POS[0]:-}"
+NAME="${POS[1]:-}"
+TYPE="${POS[2]:-bash}"
+
+if [[ -z "$CAT" || -z "$NAME" ]]; then
+  echo "[new-script] error: faltan CATEGORIA y/o NOMBRE" >&2
+  usage >&2
+  exit 2
+fi
+if [[ ! -d "$ROOT/$CAT" ]]; then
+  echo "[new-script] error: categoría desconocida '$CAT'. Disponibles:" >&2
+  find "$ROOT" -maxdepth 1 -mindepth 1 -type d ! -name templates ! -name tests \
+    -printf '  %f\n' 2>/dev/null | sort >&2
+  exit 2
+fi
+if [[ ! "$NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "[new-script] error: NOMBRE debe ser kebab-case ([a-z0-9-])" >&2
+  exit 2
+fi
+case "$TYPE" in
+  bash)   SRC="$ROOT/templates/template.bash" ;;
+  python) SRC="$ROOT/templates/template.py" ;;
+  *)      echo "[new-script] error: tipo desconocido '$TYPE' (bash|python)" >&2; exit 2 ;;
+esac
+
+DEST="$ROOT/$CAT/$NAME"
+if [[ -e "$DEST" ]]; then
+  echo "[new-script] error: ya existe $CAT/$NAME (no se sobrescribe)" >&2
+  exit 1
+fi
+
+N="$NAME" C="$CAT" D="$DESC" B="$BASE" python3 - "$SRC" "$DEST" <<'PY'
+import os, sys
+src, dst = sys.argv[1], sys.argv[2]
+text = open(src, encoding="utf-8").read()
+for key, env in (("{{NAME}}", "N"), ("{{CATEGORY}}", "C"), ("{{DESCRIPTION}}", "D"), ("{{BASE}}", "B")):
+    text = text.replace(key, os.environ[env])
+open(dst, "w", encoding="utf-8").write(text)
+PY
+
+chmod +x "$DEST" 2>/dev/null || true
+
+{
+  echo "[new-script] creado $CAT/$NAME ($TYPE)."
+  echo "[new-script] siguientes pasos:"
+  echo "  1. Implementar la lógica (sección 3 de la plantilla)."
+  echo "  2. Añadir la entrada en SCRIPTS de build_catalog.py (y en IMPLEMENTED al terminar)."
+  echo "  3. Regenerar el índice:  python3 build_catalog.py"
+  echo "  4. Pasar la suite:       bash tests/run_tests.sh"
+} >&2
+
+echo "$DEST"

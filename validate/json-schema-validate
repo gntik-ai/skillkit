@@ -1,0 +1,121 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["jsonschema>=4.21", "PyYAML>=6"]
+# ///
+"""json-schema-validate — Validar documentos JSON/YAML contra un JSON Schema.
+
+Pensado para verificar salidas estructuradas de agentes LLM y ficheros de
+configuración antes de usarlos. Soporta YAML multi-documento (cada documento
+se valida por separado) y lectura desde stdin con '-'.
+
+Convenciones del repo:
+  - datos por stdout; mensajes por stderr; --help funciona sin dependencias
+  - exit: 0 todos válidos · 1 algún documento inválido o ilegible ·
+    2 uso incorrecto o esquema inválido · 127 faltan dependencias
+
+Uso:
+  uv run json-schema-validate FICHERO... --schema ESQUEMA [--json]
+  cat salida.json | uv run json-schema-validate - --schema esquema.yaml
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+
+def eprint(*args: object) -> None:
+    print(*args, file=sys.stderr)
+
+
+def read_text(path: str) -> str:
+    if path == "-":
+        return sys.stdin.read()
+    return Path(path).read_text(encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog="json-schema-validate",
+        description="Valida documentos JSON/YAML contra un JSON Schema.",
+    )
+    parser.add_argument("files", nargs="+", help="Documentos a validar ('-' para stdin)")
+    parser.add_argument("--schema", required=True, help="Fichero del JSON Schema (JSON o YAML)")
+    parser.add_argument("--json", action="store_true", dest="as_json", help="Salida JSON estructurada")
+    args = parser.parse_args()
+
+    # Import perezoso: --help y los errores de uso no requieren dependencias.
+    try:
+        import yaml
+        from jsonschema import validators
+    except ImportError:
+        eprint("[json-schema-validate] error: faltan dependencias; ejecuta el script con `uv run`")
+        return 127
+
+    # Cargar y comprobar el esquema (YAML es superconjunto de JSON).
+    try:
+        schema = yaml.safe_load(read_text(args.schema))
+    except Exception as exc:
+        eprint(f"[json-schema-validate] error: no se pudo leer el esquema {args.schema}: {exc}")
+        return 2
+    validator_cls = validators.validator_for(schema)
+    try:
+        validator_cls.check_schema(schema)
+    except Exception as exc:
+        eprint(f"[json-schema-validate] error: el esquema no es un JSON Schema válido: {exc}")
+        return 2
+    validator = validator_cls(schema)
+
+    results: list[dict] = []
+    any_invalid = False
+
+    for f in args.files:
+        entry: dict = {"file": f, "valid": True, "documents": 0, "errors": []}
+        try:
+            text = read_text(f)
+            docs = list(yaml.safe_load_all(text))
+        except Exception as exc:
+            entry["valid"] = False
+            entry["errors"].append({"doc": None, "path": "", "validator": "io", "message": f"ilegible: {exc}"})
+            results.append(entry)
+            any_invalid = True
+            continue
+
+        if not docs:
+            entry["valid"] = False
+            entry["errors"].append({"doc": None, "path": "", "validator": "io", "message": "no contiene documentos"})
+            results.append(entry)
+            any_invalid = True
+            continue
+
+        for i, doc in enumerate(docs):
+            entry["documents"] += 1
+            for err in validator.iter_errors(doc):
+                path = "/".join(str(p) for p in err.absolute_path) or "(raíz)"
+                entry["errors"].append(
+                    {"doc": i, "path": path, "validator": str(err.validator), "message": err.message}
+                )
+        entry["valid"] = not entry["errors"]
+        any_invalid = any_invalid or not entry["valid"]
+        results.append(entry)
+
+    if args.as_json:
+        print(json.dumps(
+            {"schema": args.schema, "valid": not any_invalid, "results": results},
+            ensure_ascii=False, indent=2,
+        ))
+    else:
+        for r in results:
+            mark = "OK  " if r["valid"] else "FAIL"
+            print(f"{mark} {r['file']} ({r['documents']} doc)")
+            for e in r["errors"]:
+                where = f"doc {e['doc']} · {e['path']}" if e["doc"] is not None else e["path"]
+                print(f"     - [{e['validator']}] {where}: {e['message']}")
+
+    return 1 if any_invalid else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

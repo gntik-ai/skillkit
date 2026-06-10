@@ -1,0 +1,146 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["openpyxl>=3.1"]
+# ///
+"""xlsx-tool — Inspeccionar y convertir hojas de cálculo Excel (.xlsx/.xlsm).
+
+Subcomandos:
+  info    FICHERO                     Hojas, dimensiones y cabeceras → texto/JSON
+  sheets  FICHERO                     Listar nombres de hoja (uno por línea)
+  csv     FICHERO [--sheet N|nombre]  Volcar una hoja como CSV (stdout)
+  json    FICHERO [--sheet N|nombre]  Volcar una hoja como JSON (lista de objetos)
+
+Convenciones del repo:
+  - datos por stdout; mensajes por stderr; --help funciona sin dependencias
+  - --sheet acepta índice (1-based) o nombre; por defecto, la hoja activa
+  - --no-header trata la primera fila como datos (json/csv usan claves col1,col2…)
+  - exit: 0 ok · 1 fichero/hoja no encontrada · 2 uso incorrecto · 127 falta dependencia
+
+Ejemplos:
+  uv run xlsx-tool info brd.xlsx --json
+  uv run xlsx-tool csv brd.xlsx --sheet "Requisitos" > req.csv
+  uv run xlsx-tool json brd.xlsx --sheet 1
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import io
+import json
+import sys
+from pathlib import Path
+
+
+def eprint(*args: object) -> None:
+    print(*args, file=sys.stderr)
+
+
+def pick_sheet(wb, selector: str | None):
+    if selector is None:
+        return wb.active
+    if selector.isdigit():
+        idx = int(selector) - 1
+        names = wb.sheetnames
+        if not (0 <= idx < len(names)):
+            raise KeyError(f"índice de hoja fuera de rango: {selector} (hay {len(names)})")
+        return wb[names[idx]]
+    if selector not in wb.sheetnames:
+        raise KeyError(f"hoja no encontrada: {selector}")
+    return wb[selector]
+
+
+def rows_as_records(ws, has_header: bool) -> list[dict]:
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return []
+    if has_header:
+        headers = [str(c) if c is not None else f"col{i+1}" for i, c in enumerate(rows[0])]
+        body = rows[1:]
+    else:
+        headers = [f"col{i+1}" for i in range(len(rows[0]))]
+        body = rows
+    out = []
+    for r in body:
+        out.append({headers[i] if i < len(headers) else f"col{i+1}": v for i, v in enumerate(r)})
+    return out
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog="xlsx-tool", description="Inspeccionar y convertir Excel.")
+    parser.add_argument("command", choices=["info", "sheets", "csv", "json"])
+    parser.add_argument("file", help="Ruta del .xlsx/.xlsm")
+    parser.add_argument("--sheet", help="Índice (1-based) o nombre de hoja")
+    parser.add_argument("--no-header", action="store_true", help="La primera fila son datos, no cabecera")
+    parser.add_argument("--json", action="store_true", dest="as_json", help="Salida JSON (solo 'info')")
+    args = parser.parse_args()
+
+    try:
+        import openpyxl
+    except ImportError:
+        eprint("[xlsx-tool] error: falta 'openpyxl'; ejecuta el script con `uv run`")
+        return 127
+
+    path = Path(args.file)
+    if not path.is_file():
+        eprint(f"[xlsx-tool] error: no existe {args.file}")
+        return 1
+
+    try:
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    except Exception as exc:
+        eprint(f"[xlsx-tool] error: no se pudo abrir el libro: {exc}")
+        return 1
+
+    has_header = not args.no_header
+
+    if args.command == "sheets":
+        for name in wb.sheetnames:
+            print(name)
+        return 0
+
+    if args.command == "info":
+        sheets = []
+        for name in wb.sheetnames:
+            ws = wb[name]
+            first = next(ws.iter_rows(values_only=True), None)
+            headers = [str(c) if c is not None else "" for c in first] if (first and has_header) else []
+            sheets.append({
+                "name": name,
+                "rows": ws.max_row,
+                "cols": ws.max_column,
+                "headers": headers,
+            })
+        if args.as_json:
+            print(json.dumps({"file": str(path), "active": wb.active.title, "sheets": sheets},
+                             ensure_ascii=False, indent=2))
+        else:
+            print(f"{path.name} · hoja activa: {wb.active.title}")
+            for s in sheets:
+                hint = f" · cabeceras: {', '.join(h for h in s['headers'] if h)}" if s["headers"] else ""
+                print(f"  - {s['name']}: {s['rows']}×{s['cols']}{hint}")
+        return 0
+
+    # csv / json
+    try:
+        ws = pick_sheet(wb, args.sheet)
+    except KeyError as exc:
+        eprint(f"[xlsx-tool] error: {exc}")
+        return 1
+
+    if args.command == "csv":
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        for row in ws.iter_rows(values_only=True):
+            writer.writerow(["" if v is None else v for v in row])
+        sys.stdout.write(buf.getvalue())
+        return 0
+
+    # json
+    records = rows_as_records(ws, has_header)
+    print(json.dumps(records, ensure_ascii=False, indent=2, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

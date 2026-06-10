@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+#
+# k8s-get — Listar o describir recursos de Kubernetes/OpenShift en un namespace.
+#
+# Patrón de referencia para la categoría containers/ (SOLO LECTURA):
+#   - la ayuda y los errores de uso funcionan sin kubectl/oc instalado
+#   - tabla legible por defecto; --wide o --json para más detalle
+#   - sonda de conectividad contra /version: legible por cualquier usuario
+#     autenticado (rol system:discovery). 'cluster-info' exige permisos sobre
+#     kube-system que suelen faltar en clústeres con RBAC restringido y daría
+#     falsos negativos.
+#   - KUBECTL=oc reutiliza el script en OpenShift
+#   - exit: 0 ok · 1 sin conexión · 2 uso incorrecto · 127 falta la herramienta
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+k8s-get — Listar o describir recursos de Kubernetes/OpenShift.
+
+Uso:
+  k8s-get RECURSO [NOMBRE] [opciones]
+
+Opciones:
+  -n, --namespace NS      Namespace (def. el del contexto actual)
+  -A, --all-namespaces    Todos los namespaces
+  -l, --selector SEL      Selector de etiquetas (p.ej. app=api)
+      --describe          Usar 'describe' en lugar de 'get'
+      --wide              Salida ancha (-o wide; solo con 'get')
+      --json              Salida JSON (-o json; solo con 'get')
+  -h, --help              Esta ayuda
+
+Entorno:
+  KUBECTL                 Binario a usar (def. kubectl; usa 'oc' para OpenShift)
+
+Ejemplos:
+  k8s-get pods -n falcone -l app=api --wide
+  k8s-get deployment api -n falcone --json
+  KUBECTL=oc k8s-get pod my-pod -n falcone --describe
+EOF
+}
+
+# La ayuda funciona aunque falte la herramienta.
+for arg in "$@"; do case "$arg" in -h|--help) usage; exit 0 ;; esac; done
+
+KUBECTL="${KUBECTL:-kubectl}"
+
+RESOURCE=""
+NAME=""
+MODE="get"
+JSON=0
+WIDE=0
+declare -a ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--namespace)      ARGS+=(-n "$2"); shift 2 ;;
+    -A|--all-namespaces) ARGS+=(--all-namespaces); shift ;;
+    -l|--selector)       ARGS+=(-l "$2"); shift 2 ;;
+    --describe)          MODE="describe"; shift ;;
+    --wide)              WIDE=1; shift ;;
+    --json)              JSON=1; shift ;;
+    -*)                  echo "[k8s-get] opción desconocida: $1" >&2; exit 2 ;;
+    *)
+      if [[ -z "$RESOURCE" ]]; then RESOURCE="$1"
+      elif [[ -z "$NAME" ]]; then NAME="$1"
+      else echo "[k8s-get] argumento extra: $1" >&2; exit 2
+      fi
+      shift ;;
+  esac
+done
+
+# 1) Validación de uso (exit 2) ANTES de exigir la herramienta:
+#    un error de argumentos debe reportarse igual aunque kubectl no esté.
+if [[ -z "$RESOURCE" ]]; then
+  echo "[k8s-get] error: falta el tipo de recurso" >&2
+  usage >&2
+  exit 2
+fi
+if [[ "$MODE" == "describe" && ( "$JSON" -eq 1 || "$WIDE" -eq 1 ) ]]; then
+  echo "[k8s-get] error: --json/--wide no son compatibles con --describe" >&2
+  exit 2
+fi
+if [[ "$JSON" -eq 1 && "$WIDE" -eq 1 ]]; then
+  echo "[k8s-get] error: --json y --wide son excluyentes" >&2
+  exit 2
+fi
+
+# 2) Dependencia (exit 127).
+command -v "$KUBECTL" >/dev/null 2>&1 || {
+  echo "[k8s-get] error: '$KUBECTL' no está instalado o no está en PATH" >&2
+  exit 127
+}
+
+# 3) Conectividad: /version es accesible para cualquier usuario autenticado,
+#    así no fallamos en clústeres donde el RBAC bloquea cluster-info.
+if ! "$KUBECTL" version --request-timeout=5s >/dev/null 2>&1; then
+  echo "[k8s-get] error: no hay conexión con el clúster (revisa contexto/kubeconfig/login)" >&2
+  exit 1
+fi
+
+declare -a CMD=("$KUBECTL" "$MODE" "$RESOURCE")
+[[ -n "$NAME" ]] && CMD+=("$NAME")
+[[ ${#ARGS[@]} -gt 0 ]] && CMD+=("${ARGS[@]}")
+[[ "$JSON" -eq 1 ]] && CMD+=(-o json)
+[[ "$WIDE" -eq 1 ]] && CMD+=(-o wide)
+
+exec "${CMD[@]}"

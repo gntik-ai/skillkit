@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""llm-call — Llamar a un endpoint LLM (OpenAI-compatible o Anthropic) y devolver la respuesta.
+
+Solo usa la librería estándar: no requiere instalación y emplea el almacén de
+certificados del sistema (funciona detrás de proxies corporativos con
+inspección TLS). Sirve igual para endpoints privados (vLLM, Ollama, LiteLLM,
+text-generation-inference) que para las APIs públicas.
+
+Entorno:
+  LLM_BASE_URL    URL base del endpoint (def.: la oficial según --api)
+  LLM_MODEL       Modelo por defecto
+  LLM_API_KEY     Clave (también OPENAI_API_KEY / ANTHROPIC_API_KEY).
+                  Opcional: muchos endpoints privados no requieren clave.
+
+Convenciones del repo:
+  - el texto de la respuesta va por stdout; mensajes por stderr
+  - --json devuelve {api, model, content, usage, finish_reason}
+  - exit: 0 ok · 1 error HTTP/conexión · 2 uso incorrecto · 3 respuesta vacía
+
+Ejemplos:
+  llm-call "Resume este texto: ..." --model gpt-4o --json
+  cat informe.md | llm-call --system "Eres un auditor" --model qwen2 \
+      --base-url http://vllm.interno:8000/v1
+  llm-call "Hola" --api anthropic --model claude-sonnet-4-5
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+
+def eprint(*args: object) -> None:
+    print(*args, file=sys.stderr)
+
+
+def resolve_prompt(args: argparse.Namespace) -> str:
+    if args.prompt:
+        return args.prompt
+    if args.file:
+        return Path(args.file).read_text(encoding="utf-8")
+    if not sys.stdin.isatty():
+        return sys.stdin.read()
+    return ""
+
+
+def build_request(args: argparse.Namespace, prompt: str, model: str, key: str) -> urllib.request.Request:
+    if args.api == "anthropic":
+        base = (args.base_url or "https://api.anthropic.com").rstrip("/")
+        url = f"{base}/v1/messages"
+        body: dict = {
+            "model": model,
+            "max_tokens": args.max_tokens or 1024,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if args.system:
+            body["system"] = args.system
+        if args.temperature is not None:
+            body["temperature"] = args.temperature
+        headers = {"Content-Type": "application/json", "anthropic-version": "2023-06-01"}
+        if key:
+            headers["x-api-key"] = key
+    else:  # openai-compatible
+        base = (args.base_url or "https://api.openai.com/v1").rstrip("/")
+        url = f"{base}/chat/completions"
+        messages = []
+        if args.system:
+            messages.append({"role": "system", "content": args.system})
+        messages.append({"role": "user", "content": prompt})
+        body = {"model": model, "messages": messages}
+        if args.temperature is not None:
+            body["temperature"] = args.temperature
+        if args.max_tokens:
+            body["max_tokens"] = args.max_tokens
+        headers = {"Content-Type": "application/json"}
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
+    return urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
+
+
+def send_with_retries(req: urllib.request.Request, timeout: int, retries: int) -> str | None:
+    """Devuelve el cuerpo de la respuesta, o None tras agotar reintentos."""
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", "replace")[:400]
+            if exc.code in (429, 500, 502, 503, 504) and attempt < retries:
+                wait = 2 ** attempt
+                eprint(f"[llm-call] HTTP {exc.code}; reintento en {wait}s…")
+                time.sleep(wait)
+                continue
+            eprint(f"[llm-call] error HTTP {exc.code}: {detail}")
+            return None
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if attempt < retries:
+                wait = 2 ** attempt
+                eprint(f"[llm-call] error de conexión ({exc}); reintento en {wait}s…")
+                time.sleep(wait)
+                continue
+            eprint(f"[llm-call] error de conexión: {exc}")
+            return None
+    return None
+
+
+def parse_content(api: str, data: dict) -> tuple[str, object, object]:
+    """Extracción tolerante de (content, usage, finish_reason)."""
+    if api == "anthropic":
+        blocks = data.get("content") or []
+        content = "".join(
+            b.get("text", "") for b in blocks if isinstance(b, dict) and b.get("type") == "text"
+        )
+        return content, data.get("usage"), data.get("stop_reason")
+    choices = data.get("choices") or []
+    first = choices[0] if choices else {}
+    message = first.get("message") if isinstance(first, dict) else {}
+    content = (message or {}).get("content") or ""
+    finish = first.get("finish_reason") if isinstance(first, dict) else None
+    return content, data.get("usage"), finish
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog="llm-call",
+        description="Llama a un endpoint LLM y devuelve la respuesta por stdout.",
+    )
+    parser.add_argument("prompt", nargs="?", help="Prompt (también acepta --file o stdin)")
+    parser.add_argument("--file", help="Leer el prompt desde un fichero")
+    parser.add_argument("--system", help="Mensaje de sistema")
+    parser.add_argument("--api", choices=["openai", "anthropic"], default="openai",
+                        help="Dialecto de la API (def. openai, válido para vLLM/Ollama/LiteLLM)")
+    parser.add_argument("--model", default=os.environ.get("LLM_MODEL", ""), help="Modelo (o env LLM_MODEL)")
+    parser.add_argument("--base-url", default=os.environ.get("LLM_BASE_URL", ""),
+                        help="URL base del endpoint (o env LLM_BASE_URL)")
+    parser.add_argument("--temperature", type=float, default=None)
+    parser.add_argument("--max-tokens", type=int, default=None)
+    parser.add_argument("--timeout", type=int, default=120, help="Timeout en segundos (def. 120)")
+    parser.add_argument("--retries", type=int, default=2, help="Reintentos ante 429/5xx/conexión (def. 2)")
+    parser.add_argument("--json", action="store_true", dest="as_json", help="Salida JSON estructurada")
+    args = parser.parse_args()
+
+    prompt = resolve_prompt(args)
+    if not prompt.strip():
+        eprint("[llm-call] error: falta el prompt (argumento, --file o stdin)")
+        return 2
+    if not args.model:
+        eprint("[llm-call] error: falta --model (o la variable LLM_MODEL)")
+        return 2
+
+    key = os.environ.get("LLM_API_KEY") or (
+        os.environ.get("ANTHROPIC_API_KEY") if args.api == "anthropic" else os.environ.get("OPENAI_API_KEY")
+    ) or ""
+
+    req = build_request(args, prompt, args.model, key)
+    eprint(f"[llm-call] {args.api} → {req.full_url} (model={args.model})")
+    raw = send_with_retries(req, args.timeout, max(args.retries, 0))
+    if raw is None:
+        return 1
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        eprint(f"[llm-call] error: la respuesta no es JSON: {raw[:300]}")
+        return 1
+
+    content, usage, finish = parse_content(args.api, data)
+    if not content.strip():
+        eprint("[llm-call] error: respuesta sin contenido de texto")
+        eprint(raw[:300])
+        return 3
+
+    if args.as_json:
+        print(json.dumps(
+            {
+                "api": args.api,
+                "model": data.get("model") or args.model,
+                "content": content,
+                "usage": usage,
+                "finish_reason": finish,
+            },
+            ensure_ascii=False, indent=2,
+        ))
+    else:
+        print(content)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

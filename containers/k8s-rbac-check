@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+#
+# k8s-rbac-check — Comprobar permisos RBAC en Kubernetes/OpenShift (auth can-i).
+#
+# Patrón de la categoría containers/ (SOLO LECTURA): responde "¿puede X hacer Y
+# sobre Z?" sin modificar nada. Útil para auditar aislamiento entre tenants y
+# permisos de ServiceAccounts.
+#
+# Convenciones del repo:
+#   - la ayuda y los errores de uso funcionan sin kubectl/oc instalado
+#   - --list enumera todo lo permitido en el namespace; si no, comprueba
+#     verbo(s) + recurso y responde yes/no
+#   - texto legible por defecto; --json para varios verbos
+#   - KUBECTL=oc reutiliza el script en OpenShift
+#   - exit: 0 permitido / listado OK · 1 denegado o sin conexión ·
+#     2 uso incorrecto · 127 falta la herramienta
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+k8s-rbac-check — Comprobar permisos RBAC (auth can-i).
+
+Uso:
+  k8s-rbac-check VERBO[,VERBO...] RECURSO [opciones]
+  k8s-rbac-check --list [opciones]
+
+Opciones:
+  -n, --namespace NS    Namespace objetivo
+  -A, --all-namespaces  Ámbito de cluster (--list)
+      --as USUARIO      Comprobar como otro usuario (impersonación)
+      --as-group GRUPO  Grupo para la impersonación (repetible)
+      --sa NS:NOMBRE    Comprobar como un ServiceAccount
+      --subresource SR  Subrecurso (p.ej. log, status, exec)
+      --name NOMBRE     Nombre concreto del recurso
+      --json            Salida JSON (útil con varios verbos)
+  -h, --help            Esta ayuda
+
+Entorno:
+  KUBECTL               Binario (def. kubectl; usa 'oc' para OpenShift)
+
+Ejemplos:
+  k8s-rbac-check get,list,watch pods -n falcone
+  k8s-rbac-check create deployments -n falcone --sa falcone:deployer
+  k8s-rbac-check delete secrets -n other-tenant --as dev@empresa.com
+  k8s-rbac-check --list -n falcone --json
+EOF
+}
+
+err() { echo "[k8s-rbac-check] $*" >&2; }
+
+# La ayuda funciona aunque falte la herramienta.
+for arg in "$@"; do case "$arg" in -h|--help) usage; exit 0 ;; esac; done
+
+KUBECTL="${KUBECTL:-kubectl}"
+
+LIST=0
+JSON=0
+VERBS=""
+RESOURCE=""
+declare -a SCOPE=()     # -n NS | --all-namespaces
+declare -a IDENTITY=()  # --as / --as-group / impersonación de SA
+declare -a EXTRA=()     # --subresource / --name
+declare -a POS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --list)            LIST=1; shift ;;
+    -n|--namespace)    SCOPE+=(-n "$2"); shift 2 ;;
+    -A|--all-namespaces) SCOPE+=(--all-namespaces); shift ;;
+    --as)              IDENTITY+=(--as "$2"); shift 2 ;;
+    --as-group)        IDENTITY+=(--as-group "$2"); shift 2 ;;
+    --sa)
+      # NS:NOMBRE → usuario system:serviceaccount:NS:NOMBRE
+      if [[ "$2" != *:* ]]; then err "--sa requiere formato NS:NOMBRE"; exit 2; fi
+      IDENTITY+=(--as "system:serviceaccount:${2%%:*}:${2##*:}"); shift 2 ;;
+    --subresource)     EXTRA+=(--subresource "$2"); shift 2 ;;
+    --name)            EXTRA+=(--name "$2"); shift 2 ;;
+    --json)            JSON=1; shift ;;
+    -*)                err "opción desconocida: $1"; exit 2 ;;
+    *)                 POS+=("$1"); shift ;;
+  esac
+done
+
+# 1) Validación de uso (exit 2) antes de exigir la herramienta.
+if [[ "$LIST" -eq 0 ]]; then
+  VERBS="${POS[0]:-}"
+  RESOURCE="${POS[1]:-}"
+  if [[ -z "$VERBS" || -z "$RESOURCE" ]]; then
+    err "indica VERBO y RECURSO, o usa --list"
+    usage >&2
+    exit 2
+  fi
+fi
+
+# 2) Dependencia (exit 127).
+command -v "$KUBECTL" >/dev/null 2>&1 || { err "error: '$KUBECTL' no está instalado"; exit 127; }
+
+# 3) Conectividad (/version: legible con RBAC restringido).
+if ! "$KUBECTL" version --request-timeout=5s >/dev/null 2>&1; then
+  err "error: no hay conexión con el clúster (revisa contexto/kubeconfig/login)"
+  exit 1
+fi
+
+# Modo listado.
+if [[ "$LIST" -eq 1 ]]; then
+  exec "$KUBECTL" auth can-i --list "${SCOPE[@]}" "${IDENTITY[@]}"
+fi
+
+# Comprobación de uno o varios verbos.
+IFS=',' read -r -a VERB_ARR <<< "$VERBS"
+OVERALL=0
+declare -a RESULTS=()
+
+for v in "${VERB_ARR[@]}"; do
+  [[ -z "$v" ]] && continue
+  ANS="$("$KUBECTL" auth can-i "$v" "$RESOURCE" "${SCOPE[@]}" "${IDENTITY[@]}" "${EXTRA[@]}" 2>/dev/null || true)"
+  if [[ "$ANS" == "yes" ]]; then
+    RESULTS+=("$v=yes")
+  else
+    RESULTS+=("$v=no")
+    OVERALL=1
+  fi
+done
+
+if [[ "$JSON" -eq 1 ]]; then
+  printf '{'
+  printf '"resource":"%s","allowed":%s,"verbs":{' "$RESOURCE" "$([[ $OVERALL -eq 0 ]] && echo true || echo false)"
+  first=1
+  for r in "${RESULTS[@]}"; do
+    [[ $first -eq 0 ]] && printf ','
+    printf '"%s":%s' "${r%%=*}" "$([[ "${r##*=}" == "yes" ]] && echo true || echo false)"
+    first=0
+  done
+  printf '}}\n'
+else
+  for r in "${RESULTS[@]}"; do
+    printf '%-4s %s %s\n' "${r##*=}" "${r%%=*}" "$RESOURCE"
+  done
+fi
+
+exit "$OVERALL"
