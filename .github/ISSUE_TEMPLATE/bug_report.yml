@@ -1,0 +1,47 @@
+name: Bug report
+description: A script behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do **not** include secrets, tokens, or
+        internal hostnames. For a security vulnerability, do not open a public
+        issue — follow SECURITY.md instead.
+  - type: input
+    id: script
+    attributes:
+      label: Script
+      description: Which script? (e.g. containers/k8s-rbac-check)
+      placeholder: category/script-name
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command run
+      description: The exact command, with secrets/hostnames redacted.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the exit code and any stderr output (redacted).
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, shell, and tool versions (e.g. `uv --version`, `kubectl version --client`).
+      render: shell
+    validations:
+      required: false

@@ -1,0 +1,17 @@
+# Code owners. Combined with branch protection ("Require review from Code
+# Owners"), every change needs an approving review from the owner(s) below.
+#
+# Owner: @gntik-ai. Replace with a team (e.g. @gntik-ai/maintainers) if you prefer.
+
+# Default: everything requires owner review.
+*                       @gntik-ai
+
+# Security-sensitive paths. Changes here can alter what runs in CI or how
+# scripts behave — never relax review on these. Workflow changes in
+# particular get the highest scrutiny (see SECURITY.md).
+/.github/               @gntik-ai
+/.github/workflows/     @gntik-ai
+/build_catalog.py       @gntik-ai
+/new-script             @gntik-ai
+/templates/             @gntik-ai
+/tests/                 @gntik-ai

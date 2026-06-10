@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/gntik-ai/skillkit/security/advisories/new
+    about: Do NOT open a public issue for security problems. Report privately here (see SECURITY.md).
+  - name: Question or idea
+    url: https://github.com/gntik-ai/skillkit/discussions
+    about: Use Discussions for open-ended questions and ideas.

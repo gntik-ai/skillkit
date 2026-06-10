@@ -1,0 +1,102 @@
+name: CI
+
+# SECURITY MODEL (see SECURITY.md for the full rules):
+#   * This workflow uses `pull_request`, NEVER `pull_request_target`.
+#     For pull requests from forks GitHub therefore provides a READ-ONLY
+#     GITHUB_TOKEN and NO access to repository secrets. Untrusted code that
+#     runs here cannot push to the repo, read secrets, or publish anything.
+#   * Fork pull requests must still be approved by a maintainer before any
+#     job runs ("Require approval for all outside collaborators" — see
+#     SECURITY.md). Approval = a human has read the diff first.
+#   * The job below only runs the hermetic test suite: no network calls,
+#     no credentials, no `gh`/`kubectl`/cloud access are required or used.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Least privilege for the default token (applies to all jobs).
+permissions:
+  contents: read
+
+# Bound compute abuse: cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    # These steps only PARSE the scripts; they never execute repo code.
+    name: Static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (do not persist the token to .git/config)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: ShellCheck (parses scripts, does not run them)
+        run: |
+          set -euo pipefail
+          shellcheck --version
+          n=0
+          while IFS= read -r f; do
+            case "$(head -n1 "$f" 2>/dev/null)" in
+              '#!'*bash*)
+                echo "::group::shellcheck $f"
+                shellcheck -S warning "$f"
+                echo "::endgroup::"
+                n=$((n + 1)) ;;
+            esac
+          done < <(find . -path ./.git -prune -o -type f -print | sort)
+          echo "checked $n bash script(s)"
+          [ "$n" -gt 0 ]
+
+      - name: Bash syntax (-n, does not run them)
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do
+            case "$(head -n1 "$f" 2>/dev/null)" in
+              '#!'*bash*) bash -n "$f" && echo "ok  $f" ;;
+            esac
+          done < <(find . -path ./.git -prune -o -type f -print | sort)
+
+      - name: Python compile (compiles, does not run module code)
+        run: |
+          set -euo pipefail
+          python3 --version
+          while IFS= read -r f; do
+            case "$(head -n1 "$f" 2>/dev/null)" in
+              '#!'*python*) python3 -m py_compile "$f" && echo "ok  $f" ;;
+            esac
+          done < <(find . -path ./.git -prune -o -type f -print | sort)
+          python3 -m py_compile build_catalog.py
+
+  suite:
+    # This job EXECUTES repo code (the test harness). For fork PRs it only
+    # runs after a maintainer approves the run — that is the trust boundary.
+    name: Smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (do not persist the token to .git/config)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv (from PyPI; required by the PEP 723 scripts)
+        run: python -m pip install --upgrade uv
+
+      - name: Validate catalog
+        run: python3 build_catalog.py
+
+      - name: Run test suite (hermetic — no network, no credentials)
+        run: bash tests/run_tests.sh

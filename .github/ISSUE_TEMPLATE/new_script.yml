@@ -1,0 +1,56 @@
+name: New script proposal
+description: Propose a new script (or volunteer to implement a planned one)
+labels: ["new-script"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check `catalog.json` first — the script may already be listed as
+        `planned`. New scripts must follow CONTRIBUTING.md.
+  - type: input
+    id: id
+    attributes:
+      label: Proposed id and category
+      description: kebab-case, one responsibility (e.g. obs/prom-query)
+      placeholder: category/script-name
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: What should it do?
+      description: One clear responsibility. What goes in, what comes out.
+    validations:
+      required: true
+  - type: input
+    id: base
+    attributes:
+      label: Base tool(s)
+      description: Underlying CLI/library it wraps, if any (e.g. promtool, curl).
+    validations:
+      required: false
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - bash
+        - python
+    validations:
+      required: true
+  - type: checkboxes
+    id: conventions
+    attributes:
+      label: Fits the conventions
+      options:
+        - label: It can offer `--json`, `--help` without dependencies, and `--dry-run` for any write operation.
+          required: false
+        - label: It needs no secrets baked in (env vars only) and no network in its tests.
+          required: false
+  - type: checkboxes
+    id: volunteer
+    attributes:
+      label: Implementation
+      options:
+        - label: I'd like to implement it myself and open a PR.
+          required: false
